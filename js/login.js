@@ -30,10 +30,33 @@ async function sendMagicLink(email) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   // 若已登录，直接跳转
-  await checkExistingSession();
+  const alreadyLoggedIn = await checkExistingSession();
+  if (alreadyLoggedIn) return;
 
   const btnSend = document.getElementById('btn-send');
   const inputEmail = document.getElementById('email');
+  const btnTestLogin = document.getElementById('btn-test-login');
+
+  // 测试用密码登录
+  btnTestLogin?.addEventListener('click', async () => {
+    const email = document.getElementById('test-email').value.trim().toLowerCase();
+    const password = document.getElementById('test-password').value;
+
+    if (!email || !password) {
+      showMessage('请输入测试邮箱和密码', 'error');
+      return;
+    }
+
+    setLoading(btnTestLogin, true, '登录中...');
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      await routeAfterLogin();
+    } catch (err) {
+      showMessage(err.message || '登录失败', 'error');
+      setLoading(btnTestLogin, false);
+    }
+  });
 
   btnSend.addEventListener('click', async () => {
     const email = inputEmail.value.trim().toLowerCase();

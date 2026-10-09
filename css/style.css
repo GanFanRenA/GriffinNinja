@@ -1,4 +1,8 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 :root {
   --bg: #0f1115;
@@ -29,7 +33,9 @@ body {
   z-index: 10;
 }
 
-.site-header h1 { font-size: 18px; }
+.site-header h1 {
+  font-size: 18px;
+}
 
 .site-header nav a {
   color: var(--text);
@@ -120,11 +126,22 @@ body {
   margin-bottom: 12px;
   font-size: 14px;
 }
-.message-info { background: #1e3a5f; }
-.message-error { background: #5f1e1e; }
-.message-success { background: #1e5f2e; }
 
-input, textarea, select {
+.message-info {
+  background: #1e3a5f;
+}
+
+.message-error {
+  background: #5f1e1e;
+}
+
+.message-success {
+  background: #1e5f2e;
+}
+
+input,
+textarea,
+select {
   width: 100%;
   padding: 12px;
   background: #0f1115;
@@ -191,7 +208,9 @@ input, textarea, select {
 }
 
 @media (min-width: 600px) {
-  .colleges-grid { grid-template-columns: repeat(4, 1fr); }
+  .colleges-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .btn-secondary {
@@ -257,4 +276,196 @@ input, textarea, select {
   color: var(--muted);
   margin-top: 4px;
   word-break: break-all;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.modal-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 360px;
+  width: 100%;
+}
+
+.modal-box h3 {
+  margin-bottom: 12px;
+}
+
+.modal-box p {
+  margin-bottom: 16px;
+  color: var(--muted);
+}
+
+.watermark {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  opacity: 0.06;
+  overflow: hidden;
+}
+
+.watermark span {
+  font-size: 12px;
+  transform: rotate(-30deg);
+  padding: 40px 20px;
+  white-space: nowrap;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.status-alive {
+  background: #1e5f2e;
+  color: #b8f5c8;
+}
+
+.status-eliminated {
+  background: #5f1e1e;
+  color: #f5b8b8;
+}
+
+.status-winner {
+  background: #7a5c00;
+  color: #ffe9a8;
+}
+
+.my-code {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  text-align: center;
+  padding: 20px;
+  background: #0f1115;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  font-family: monospace;
+}
+
+.my-code.muted {
+  color: var(--muted);
+  font-size: 18px;
+  letter-spacing: 2px;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.tab {
+  padding: 8px 14px;
+  background: var(--card);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.tab.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.tab-panel {
+  display: none;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tab-panel.active {
+  display: flex;
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.admin-row:last-child {
+  border-bottom: none;
+}
+
+.admin-name {
+  font-weight: 600;
+}
+
+.admin-meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.btn-mini {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-mini.btn-warn {
+  border-color: #b03030;
+  color: #f5b8b8;
+}
+
+.color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.report-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.report-item:last-child {
+  border-bottom: none;
+}
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.btn-row button {
+  flex: 1;
+}
+
+@media (max-width: 600px) {
+  .admin-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

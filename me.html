@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>我的 - NinjaTag</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <!-- 隐私提醒弹窗 -->
+    <div id="privacy-modal" class="modal-overlay">
+        <div class="modal-box">
+            <h3>隐私提醒</h3>
+            <p>目标信息仅你可见。请确认周围无人后再查看。</p>
+            <button id="btn-privacy-ok" class="btn-primary">我已确认，周围无人</button>
+        </div>
+    </div>
+
+    <!-- 水印层 -->
+    <div id="watermark" class="watermark"></div>
+
+    <header class="site-header">
+        <h1>NinjaTag</h1>
+        <nav>
+            <a href="index.html">首页</a>
+            <a href="#" id="nav-logout">退出</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div id="message" class="message" style="display:none"></div>
+
+        <!-- 加载中 -->
+        <div id="loading">加载中...</div>
+
+        <div id="content" style="display:none">
+            <!-- 我的状态 -->
+            <section class="card">
+                <h2>我的状态</h2>
+                <div id="my-status" class="status-badge">-</div>
+                <div id="eliminated-info" style="display:none"></div>
+                <div id="event-status-info" class="hint"></div>
+            </section>
+
+            <!-- 我的代码 -->
+            <section class="card" id="code-section">
+                <h2>我的代码</h2>
+                <div id="my-code" class="my-code">-</div>
+                <p class="hint">不要公开你的代码。别人击杀你时需要输入它。</p>
+            </section>
+
+            <!-- 当前目标 -->
+            <section class="card" id="target-section">
+                <h2>我当前的目标</h2>
+                <div id="target-empty" class="hint">暂无目标</div>
+                <div id="target-card" style="display:none">
+                    <div class="identity-card">
+                        <img id="target-photo" src="assets/placeholder.png" alt="目标">
+                        <div class="identity-info">
+                            <div class="identity-name" id="target-name">-</div>
+                            <div class="identity-college" id="target-college">-</div>
+                        </div>
+                    </div>
+                    <button id="btn-open-kill" class="btn-primary">击杀该目标</button>
+                </div>
+            </section>
+
+            <!-- 击杀表单 -->
+            <section class="card" id="kill-form" style="display:none">
+                <h2>击杀确认</h2>
+                <p class="hint">请输入目标当前正在追击的人的代码。</p>
+                <input type="text" id="kill-code" placeholder="输入目标代码" maxlength="6" autocomplete="off">
+                <button id="btn-submit-kill" class="btn-primary">提交击杀</button>
+                <button id="btn-cancel-kill" class="btn-secondary">取消</button>
+            </section>
+
+            <!-- 举报 -->
+            <section class="card" id="report-section">
+                <h2>举报目标</h2>
+                <div id="report-form" style="display:none">
+                    <input type="text" id="report-reason" placeholder="举报原因（简短）">
+                    <textarea id="report-desc" rows="3" placeholder="详细描述"></textarea>
+                    <button id="btn-submit-report" class="btn-danger">提交举报</button>
+                </div>
+                <button id="btn-open-report" class="btn-secondary">我要举报</button>
+            </section>
+
+            <!-- 我已淘汰的人 -->
+            <section class="card">
+                <h2>我已淘汰的人</h2>
+                <div id="my-kills-list" class="wall-grid">
+                    <p class="hint">暂无</p>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script type="module" src="js/me.js"></script>
+</body>
+
+</html>

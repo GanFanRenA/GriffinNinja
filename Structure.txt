@@ -1,0 +1,621 @@
+python3 -m http.server 8080
+
+================================================================
+NinjaTag Event Website Requirements Specification
+Version: 1.1
+Date: 2026-10-09
+================================================================
+
+I. Project Overview
+----------------------------------------------------------------
+NinjaTag is an offline chase-and-elimination event held within a school. Each participant has one target, forming a global one-way ring. After eliminating a target, the participant inherits the target’s target, until only one person remains. The event lasts 5 days. Participants are divided into four factions: Red, Yellow, Blue, Green. Factions are assigned by college. For each valid kill, the killer’s faction receives a fixed +1 point. The faction of the final person receives no extra points.
+
+Website requirements:
+- Everyone can access the public homepage.
+- Participants log in with a school email.
+- First login requires identity confirmation (name, photo, college, faction).
+- The personal page is private; only the person can see target information.
+- Kills are confirmed by entering “the code of the target’s current target.”
+- Scale of about 200 people, stable, mobile-first.
+- Only two roles: admin and player.
+- Admins have all modification permissions.
+- Players cannot modify anything; they can only view and submit operations allowed by the rules.
+
+================================================================
+II. Roles and Permissions
+================================================================
+
+1. Unauthenticated Visitor
+   - Access the public homepage.
+   - View event status, faction scores, Alive Wall, today’s rules, and final winner.
+   - Cannot view anyone’s target information.
+   - Cannot kill, report, or enter the personal page.
+   - Cannot modify any data.
+
+2. Player (logged in and identity confirmed)
+   - View personal page.
+   - View own code.
+   - View own current target (photo, name, college, faction).
+   - Submit a kill (enter the code of the target’s current target).
+   - Report target (anonymous to participants; admins can see the reporter).
+   - View targets they have eliminated.
+   - View own status (alive / eliminated / winner).
+   - View announcements and daily rules.
+   - Cannot access the admin backend.
+   - Cannot view other people’s targets.
+   - Cannot modify any data.
+   - Cannot edit personal profile, faction, code, target relationships, scores, rules, announcements, etc.
+   - Can only trigger kills and reports through rule-allowed endpoints, which are validated and executed by the server.
+
+3. Admin
+   - Has all viewing permissions.
+   - Has all modification permissions.
+   - Import, edit, and delete participants.
+   - Upload and replace photos.
+   - Set college-to-faction mapping.
+   - Generate codes, generate the ring, and manually adjust target relationships.
+   - View the global chain.
+   - Publish, modify, and delete daily rules and announcements.
+   - View reports and can see the reporter.
+   - Handle and reject reports.
+   - View kill records.
+   - Revoke kills, restore the ring, and deduct faction points.
+   - Manage faction scores (add, deduct, reset).
+   - Start / pause / end the event.
+   - Export data.
+   - View audit logs.
+   - Manage other admin accounts.
+   - Reset event data.
+   - Roll back abnormal operations.
+   - Delete data.
+   - All key operations write audit logs.
+
+4. System
+   - Send login emails.
+   - Generate unique codes.
+   - Generate a random ring.
+   - Validate kill codes.
+   - Transactionally update the ring, status, and faction scores.
+   - Write audit logs.
+   - Broadcast homepage updates in real time.
+
+================================================================
+III. Feature List
+================================================================
+
+1. Authentication and Login
+   1.1 School Email Login
+       - Only allow specified school email domains.
+       - Use an email verification code or Magic Link; logging in by only entering an email is not allowed.
+       - Email must be verified before entering the system.
+   1.2 First-Time Identity Confirmation
+       - On first login, the system looks up the participant record pre-imported by admins based on email.
+       - Display name, photo, college, and faction.
+       - User clicks “This is me” to complete binding.
+       - If the information is incorrect, click “This is not me”; entry is prohibited and admins are notified.
+       - After confirmation, subsequent logins go directly to the personal page.
+   1.3 Session Management
+       - Keep login state and support logout.
+       - Personal page responses must disable caching (no-store).
+
+2. Public Homepage
+   2.1 Event Status
+       - Not started / In progress / Paused / Ended.
+   2.2 Four Faction Scores
+       - Current scores of Red, Yellow, Blue, and Green.
+       - Fixed +1 point; no points added for the final person.
+   2.3 Alive Wall
+       - Display full names + photos of alive participants.
+       - Public within the school; can be viewed without login.
+       - Eliminated participants are not displayed on the Alive Wall.
+   2.4 Number of Alive and Eliminated
+   2.5 Today’s Special Rules
+       - Display rules preset or temporarily published by admins by day.
+       - Daily rules do not affect faction scores.
+   2.6 Final Winner Entry
+       - After the event ends, display the individual winner and faction winner.
+   2.7 No Recent Battle Reports
+       - The homepage does not display real-time elimination battle reports.
+
+3. Personal Page
+   3.1 Privacy Reminder
+       - Before entering, popup: “Target information is visible only to you. Please confirm no one is around before viewing.”
+   3.2 My Code
+       - Display your unique code, used by others to verify when killing you.
+       - Codes are uniformly assigned at event start and remain fixed.
+       - Do not publicly disclose the mapping between codes and people.
+   3.3 My Current Target
+       - Display target photo, name, college, and faction.
+       - Do not display the code of the target’s current target.
+   3.4 Kill Button
+       - After clicking, require input of “the code of the person the target is currently chasing.”
+       - Server validates; if correct, the kill succeeds; if incorrect, record the failure count.
+   3.5 Report Target
+       - Fill in reason and description; may upload evidence.
+       - Anonymous to participants; admins can see the reporter.
+   3.6 Targets I Have Eliminated
+       - Display people you have eliminated: photo, name, time.
+   3.7 My Status
+       - Alive / Eliminated / Winner.
+   3.8 Eliminated Status
+       - Display “You were eliminated by XXX.”
+       - Display elimination time.
+       - No longer display the current target.
+       - Still can view people you have eliminated.
+       - Cannot continue killing.
+
+4. Kills and Inheritance
+   4.1 Kill Confirmation
+       - Hunter selects current target and clicks kill.
+       - System requires input: the code of the target’s current target.
+       - Server validates whether the code equals the code of the target’s current target.
+       - Correct: the kill succeeds, the target is eliminated, and the hunter inherits the target’s original target.
+       - Incorrect: prompt an error and record the failure count.
+   4.2 Failure Limit
+       - Exceeding the set failure count bans killing for the day; admin unlock is required.
+   4.3 Special Cases
+       - When only two people remain, the target’s target may be the hunter themself; the system allows entering the hunter’s own code.
+       - If the target has already been eliminated, prompt to refresh.
+   4.4 Transaction Requirements
+       - Kill, elimination, inheritance, and faction point addition must be completed in the same database transaction.
+       - Use row locks to prevent concurrency conflicts.
+   4.5 Victory Determination
+       - If the hunter’s new target equals themself, or only 1 alive remains, the hunter wins and the event ends.
+
+5. Factions and Scoring
+   5.1 Factions
+       - Red, Yellow, Blue, Green.
+       - Assigned by college; admins establish a “college → faction” mapping.
+       - When importing participants, fill in the college; the system automatically assigns the faction, which can be manually corrected.
+   5.2 Scoring
+       - Each valid kill gives the killer’s faction a fixed +1 point.
+       - The faction of the final person receives no extra points.
+       - When revoking a kill, faction points are deducted accordingly.
+       - Daily special rules do not affect faction scores.
+   5.3 Publication
+       - Individual winner and faction winner are announced separately.
+
+6. Reports
+   6.1 Player Submits Report
+       - Select reported target, fill in reason and description, and may upload evidence.
+       - Reports are anonymous to participants.
+   6.2 Admin Handling
+       - Admins can view reporter, reported person, reason, and evidence.
+       - Handling status: pending / resolved / rejected.
+       - Admins fill in handling notes.
+
+7. Admin Backend
+   7.1 Participant Management
+       - Import roster: email, name, college, photo.
+       - Batch upload photos.
+       - View, edit, and delete participant information.
+       - Set college-to-faction mapping.
+   7.2 Codes and Ring
+       - Generate unique codes for everyone at event start.
+       - Randomly shuffle to generate a global one-way ring.
+       - Can manually adjust target relationships.
+       - View the global chain.
+   7.3 Event Lifecycle
+       - Create event and set start/end time.
+       - Start / pause / end event.
+       - 5-day event configuration.
+   7.4 Daily Rules
+       - Preset 5-day rules.
+       - Publish, modify, or delete today’s rules.
+       - Rules do not affect faction scores.
+   7.5 Faction Score Management
+       - View scores.
+       - Manually add, deduct, and reset.
+   7.6 Report Management
+       - View report list.
+       - View reporter.
+       - Handle, reject, and add notes.
+   7.7 Kill Management
+       - View kill records.
+       - Revoke kill: restore the ring and deduct faction points.
+       - Revocation operations are automatically backed up.
+   7.8 Announcements
+       - Publish, edit, and delete announcements.
+   7.9 Data Export
+       - Export participants, kills, reports, scores, etc.
+   7.10 Audit Logs
+       - All key operations write audit logs.
+   7.11 Admin Management
+       - Add and delete admins.
+       - Set admin permissions (all admins have all modification permissions by default).
+
+8. Real-Time Updates
+   - Homepage Alive Wall, faction scores, and event status can update in real time.
+   - Use SSE or 5-second polling.
+   - Can support 200 concurrent online users.
+
+9. Data Import/Export
+   - Admins import participants via CSV.
+   - Photos are uploaded in batches named by email or student ID.
+   - Support exporting event results.
+
+10. Security and Rate Limiting
+   - Site-wide HTTPS.
+   - Email must be verified.
+   - Target information is visible only to the person.
+   - Personal page disables caching and adds a watermark (user email + time).
+   - Limit kill input attempts to prevent brute-force guessing.
+   - Rate limit login, kill, and report endpoints.
+   - All kills, revocations, score additions, and admin operations write audit logs.
+   - When revoking a kill, faction points are deducted accordingly.
+
+11. Mobile-First
+   - Responsive layout.
+   - Large buttons, suitable for one-handed operation.
+   - Lazy loading for photos, compressed WebP.
+   - Optional PWA, add to home screen.
+
+================================================================
+IV. Data Table Structure
+================================================================
+
+1. events (Event Table)
+   - id: primary key, UUID or auto-increment.
+   - name: event name.
+   - status: status, draft / active / paused / ended.
+   - start_at: start time.
+   - end_at: end time.
+   - current_day: current day, 1–5.
+   - created_at: creation time.
+   - updated_at: update time.
+
+2. factions (Faction Table)
+   - id: primary key.
+   - name: faction name, Red / Yellow / Blue / Green.
+   - color_hex: color value.
+   - score: current score, integer, default 0.
+   - created_at: creation time.
+   - updated_at: update time.
+
+3. colleges (College Table)
+   - id: primary key.
+   - name: college name.
+   - faction_id: foreign key, references factions.id, indicating the faction corresponding to the college.
+   - created_at: creation time.
+   - updated_at: update time.
+
+4. participants (Participant Table)
+   - id: primary key.
+   - event_id: foreign key, references events.id.
+   - email: school email, unique.
+   - name: name.
+   - photo_url: photo address.
+   - college_id: foreign key, references colleges.id.
+   - faction_id: foreign key, references factions.id.
+   - code: unique code, generated at event start, 6 uppercase letters + digits, excluding easily confused characters.
+   - status: status, alive / eliminated / winner.
+   - current_target_id: foreign key, references participants.id, current target.
+   - eliminated_by_id: foreign key, references participants.id, eliminated by whom.
+   - eliminated_at: elimination time.
+   - is_confirmed: whether first-time identity confirmation is completed.
+   - confirmed_at: confirmation time.
+   - created_at: creation time.
+   - updated_at: update time.
+   - Constraints: email unique; code unique; current_target_id cannot equal self (except at event start).
+
+5. eliminations (Kill Record Table)
+   - id: primary key.
+   - event_id: foreign key, references events.id.
+   - hunter_id: foreign key, references participants.id, killer.
+   - target_id: foreign key, references participants.id, eliminated person.
+   - hunter_faction_id: foreign key, references factions.id, killer’s faction.
+   - target_faction_id: foreign key, references factions.id, eliminated person’s faction.
+   - input_code: code entered by hunter.
+   - points_awarded: points awarded, fixed 1.
+   - status: status, valid / revoked.
+   - created_at: kill time.
+   - revoked_at: revocation time.
+   - revoked_by: foreign key, references admins.id, revoker.
+   - revoke_reason: revocation reason.
+
+6. kill_attempts (Kill Attempt Record Table)
+   - id: primary key.
+   - event_id: foreign key, references events.id.
+   - hunter_id: foreign key, references participants.id.
+   - target_id: foreign key, references participants.id.
+   - input_code: entered code.
+   - success: whether successful.
+   - ip: IP address.
+   - user_agent: browser information.
+   - created_at: attempt time.
+   - Purpose: prevent brute-force guessing, audit, and limit failure count.
+
+7. reports (Report Table)
+   - id: primary key.
+   - event_id: foreign key, references events.id.
+   - reporter_id: foreign key, references participants.id, reporter.
+   - target_id: foreign key, references participants.id, reported person.
+   - reason: report reason.
+   - description: detailed description.
+   - evidence_url: evidence file address.
+   - status: status, pending / resolved / rejected.
+   - admin_note: admin note.
+   - handled_by: foreign key, references admins.id, handler.
+   - handled_at: handling time.
+   - created_at: report time.
+
+8. daily_rules (Daily Rule Table)
+   - id: primary key.
+   - event_id: foreign key, references events.id.
+   - day_number: day number, 1–5.
+   - date: date.
+   - title: title.
+   - content: rule content.
+   - published: whether published.
+   - created_by: foreign key, references admins.id.
+   - created_at: creation time.
+   - updated_at: update time.
+
+9. announcements (Announcement Table)
+   - id: primary key.
+   - event_id: foreign key, references events.id.
+   - title: title.
+   - content: content.
+   - published_at: publication time.
+   - created_by: foreign key, references admins.id.
+   - created_at: creation time.
+
+10. audit_logs (Audit Log Table)
+    - id: primary key.
+    - event_id: foreign key, references events.id.
+    - actor_type: actor type, admin / participant / system.
+    - actor_id: actor ID.
+    - action: action type, e.g. login, kill, revoke_kill, update_score, import_participants.
+    - target_type: target type, e.g. participant, elimination, report, faction.
+    - target_id: target ID.
+    - details_json: detailed information, JSON format.
+    - ip: IP address.
+    - created_at: operation time.
+
+11. admins (Admin Table)
+    - id: primary key.
+    - email: admin email, unique.
+    - name: name.
+    - created_at: creation time.
+    - updated_at: update time.
+    - Note: Admins have all modification permissions by default; roles are no longer differentiated.
+
+12. sessions / tokens (Session Table, can be managed by authentication service)
+    - Managed by Supabase Auth or self-built authentication; not separately designed.
+
+================================================================
+V. Relationships Between Tables
+================================================================
+
+1. events 1 : N participants
+   - One event has multiple participants.
+
+2. events 1 : N eliminations
+   - One event has multiple kill records.
+
+3. events 1 : N reports
+   - One event has multiple reports.
+
+4. events 1 : N daily_rules
+   - One event has multiple daily rules.
+
+5. events 1 : N announcements
+   - One event has multiple announcements.
+
+6. events 1 : N kill_attempts
+   - One event has multiple kill attempt records.
+
+7. events 1 : N audit_logs
+   - One event has multiple audit logs.
+
+8. colleges N : 1 factions
+   - Multiple colleges can correspond to the same faction.
+   - Each college must belong to one faction.
+
+9. participants N : 1 colleges
+   - Each participant belongs to one college.
+
+10. participants N : 1 factions
+    - Each participant belongs to one faction.
+
+11. participants self-relation:
+    - current_target_id → participants.id
+    - eliminated_by_id → participants.id
+    - Each participant has one current target.
+    - Each eliminated person has one eliminator.
+
+12. eliminations N : 1 participants (hunter)
+    - Each kill record has one hunter.
+
+13. eliminations N : 1 participants (target)
+    - Each kill record has one eliminated target.
+
+14. eliminations N : 1 factions (hunter_faction)
+    - Records the hunter’s faction.
+
+15. eliminations N : 1 factions (target_faction)
+    - Records the target’s faction.
+
+16. kill_attempts N : 1 participants (hunter)
+    - Each attempt has one hunter.
+
+17. kill_attempts N : 1 participants (target)
+    - Each attempt has one target.
+
+18. reports N : 1 participants (reporter)
+    - Each report has one reporter.
+
+19. reports N : 1 participants (target)
+    - Each report has one reported person.
+
+20. reports N : 1 admins (handled_by)
+    - Each report can be handled by one admin.
+
+21. daily_rules N : 1 admins (created_by)
+    - Each rule is created by one admin.
+
+22. announcements N : 1 admins (created_by)
+    - Each announcement is created by one admin.
+
+23. audit_logs N : 1 events
+    - Each log belongs to one event.
+
+24. audit_logs actor can be admins or participants, distinguished by actor_type.
+
+25. eliminations N : 1 admins (revoked_by)
+    - The admin who revoked the kill.
+
+================================================================
+VI. Core Business Processes
+================================================================
+
+1. Event Initialization
+   - Admin creates event.
+   - Import participants: email, name, college, photo.
+   - Configure college → faction mapping.
+   - System generates a unique code for each participant.
+   - System randomly shuffles to generate a global one-way ring:
+     A → B → C → … → last person → A.
+   - Admin starts the event.
+
+2. Login and First Confirmation
+   - User enters school email.
+   - System sends a verification code or Magic Link.
+   - After user verifies, system looks up the participant record.
+   - First login displays name, photo, college, and faction.
+   - User confirms “This is me.”
+   - Binds email and identity; subsequent logins go directly to the personal page.
+
+3. View Personal Page
+   - User confirms a private environment before entering the personal page.
+   - Display own code.
+   - Display current target: photo, name, college, faction.
+   - Display eliminated targets.
+   - Display own status.
+
+4. Kill Process
+   - Hunter clicks “Kill current target.”
+   - System requires input: the code of the target’s current target.
+   - Hunter enters the code.
+   - Server transaction validates:
+     a. Hunter is logged in and the event is in progress.
+     b. Lock hunter and target records.
+     c. Target is indeed the hunter’s current target, and the target is alive.
+     d. Input code equals the code of the target’s current target.
+     e. Mark target as eliminated; record eliminator, time, and input code.
+     f. Hunter’s current target changes to the target’s original target.
+     g. Hunter’s faction +1 point.
+     h. Write kill record and audit log.
+     i. If the hunter’s new target equals themself, or only 1 alive remains, the hunter wins and the event ends.
+   - After submission, update the homepage Alive Wall and faction scores.
+
+5. Report Process
+   - Player selects reported target, fills in reason and description, and uploads evidence.
+   - Report is anonymous to participants.
+   - Admin views report and can see the reporter.
+   - Admin handles: resolved / rejected, and fills in notes.
+
+6. Revoke Kill
+   - Admin finds the kill record and executes revocation.
+   - Restore the ring: re-add the eliminated person and restore the hunter’s original target relationship.
+   - Deduct faction points.
+   - Update status and timeline.
+   - Write audit log.
+   - Automatic backup.
+
+7. Daily Rules
+   - Admin presets 5-day rules.
+   - Publish today’s rules each day.
+   - Rules do not affect faction scores.
+
+8. Event End
+   - Final person is produced and marked as winner.
+   - Event status changes to ended.
+   - Homepage displays individual winner and faction winner.
+   - Export data.
+
+================================================================
+VII. Non-Functional Requirements
+================================================================
+
+1. Performance
+   - Support 200 concurrent online users.
+   - Stress test target: 200 concurrent logins, target views, and kill submissions; P95 response less than 500ms.
+   - Homepage can be briefly cached for 3–5 seconds.
+   - Personal page must not be cached.
+
+2. Stability
+   - Static resources via CDN.
+   - Photos compressed to WebP and lazy loaded.
+   - Database connection pool.
+   - Kill transaction + row lock.
+   - Rate limit login, kill, and report endpoints.
+   - Daily automatic backup, manual snapshot before event.
+   - Degradation mode: under high pressure, public pages read-only and kill submissions paused.
+   - Monitor error rate, response time, and online users.
+
+3. Security
+   - Site-wide HTTPS.
+   - Email must be verified.
+   - Target information visible only to the person.
+   - Personal page response no-store.
+   - Target card watermark: user email + time.
+   - Codes do not publicly disclose mapping.
+   - Limit kill input attempts to prevent brute-force guessing.
+   - Reports anonymous to participants; admins can see the reporter.
+   - All key operations write audit logs.
+   - When revoking a kill, faction points are deducted accordingly.
+
+4. Usability
+   - Mobile-first.
+   - Responsive layout.
+   - Large buttons, suitable for one-handed operation.
+   - Optional PWA.
+
+5. Technical Architecture Recommendations
+   - Frontend: Next.js / React / Vue.
+   - Deployment: Vercel / Cloudflare Pages.
+   - Backend: Next.js API Routes or Supabase Edge Functions.
+   - Database: Supabase PostgreSQL.
+   - Authentication: Supabase Auth + school email Magic Link / verification code.
+   - Email: Resend / SendGrid / Postmark.
+   - Storage: Supabase Storage.
+   - Real-time: Supabase Realtime or SSE.
+   - Monitoring: Sentry + UptimeRobot.
+   - Backup: daily automatic backup + pre-event snapshot.
+   - Note: If used in China, it is recommended to choose Singapore or Japan nodes, or adopt a hybrid architecture with a domestic backend + Supabase database.
+
+================================================================
+VIII. Items to Be Confirmed
+================================================================
+
+1. Specific mapping table from colleges to factions.
+2. Code format and generation rules (6 characters, uppercase letters + digits, excluding easily confused characters).
+3. Specific content of daily special rules.
+4. Report handling time limits and process.
+5. Whether first-time login will be opened in advance before event start.
+6. Whether the homepage needs a “My Code” entry, or whether it should only be displayed on the personal page.
+7. Whether to arrange all-member login confirmation and rehearsal before event start (tentatively to be discussed later).
+8. Photo and name authorization has been confirmed, but authorization records need to be retained.
+9. Final choice of latency optimization solution for domestic access to Supabase.
+
+================================================================
+IX. Notes
+================================================================
+
+- Homepage does not display recent battle reports.
+- Factions are assigned by college and fixed.
+- Each valid kill gives a fixed +1 point.
+- The faction of the final person receives no extra points.
+- Daily rules do not affect faction scores.
+- Each person has a unique code, assigned at event start.
+- Kills require entering “the code of the target’s current target.”
+- Reports are anonymous to participants; admins can see the reporter.
+- Roles are only admin and player.
+- Admins have all modification permissions.
+- Players cannot modify anything; they can only view and submit operations allowed by the rules.
+- 200-person scale; monolith + managed database is sufficiently stable.
+
+================================================================
+Document End
+================================================================

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>身份确认 - NinjaTag</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>NinjaTag</h1>
+    <nav>
+      <a href="#" id="nav-logout">退出</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>身份确认</h2>
+      <p class="hint">首次登录需要确认你的身份信息。请核对以下内容是否为本人。</p>
+
+      <div id="message" class="message" style="display:none"></div>
+
+      <div id="loading">加载中...</div>
+
+      <div id="profile" style="display:none">
+        <div class="identity-card">
+          <img id="photo" src="assets/placeholder.png" alt="头像">
+          <div class="identity-info">
+            <div class="identity-name" id="name">-</div>
+            <div class="identity-college" id="college">-</div>
+            <div class="identity-email" id="email">-</div>
+          </div>
+        </div>
+
+        <button id="btn-confirm" class="btn-primary">这是我</button>
+        <button id="btn-reject" class="btn-secondary">这不是我</button>
+
+        <div id="reject-form" style="display:none">
+          <label for="reject-note">请说明情况（会通知管理员）</label>
+          <textarea id="reject-note" rows="3" placeholder="例如：这不是我的照片 / 我的名字有误"></textarea>
+          <button id="btn-submit-reject" class="btn-danger">提交</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/confirm.js"></script>
+</body>
+</html>

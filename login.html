@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>登录 - NinjaTag</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <h1>NinjaTag</h1>
+    <nav>
+      <a href="index.html">首页</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <h2>登录</h2>
+      <p>仅限学校邮箱登录。</p>
+
+      <div id="message" class="message" style="display:none"></div>
+
+      <div id="step-email">
+        <label for="email">学校邮箱</label>
+        <input type="email" id="email" placeholder="your@school.edu" autocomplete="email">
+        <button id="btn-send" class="btn-primary">发送登录链接</button>
+      </div>
+
+      <div id="step-sent" style="display:none">
+        <p>登录链接已发送到你的邮箱，请查收并点击链接。</p>
+        <p class="hint">如果没有收到，请检查垃圾邮件。</p>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

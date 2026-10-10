@@ -66,19 +66,30 @@ function renderTodayRule(rule) {
   document.getElementById('rule-title').textContent = rule.title || '';
   document.getElementById('rule-content').textContent = rule.content || '';
 }
+let lastAliveWallKey = '';
 
 function renderAliveWall(list) {
   const el = document.getElementById('alive-wall-list');
+
+  // 生成数据指纹，用于判断是否变化
+  const key = list.map(p => `${p.id}|${p.photo_url || ''}|${p.name}`).join(',');
+
+  if (key === lastAliveWallKey) {
+    return; // 数据没变，不重渲染
+  }
+  lastAliveWallKey = key;
+
   if (!list.length) {
     el.innerHTML = '<p>暂无存活者</p>';
     return;
   }
+
   el.innerHTML = list.map(p => `
     <div class="wall-item">
       <img src="${escapeHtml(p.photo_url || 'assets/placeholder.png')}"
-           alt="${escapeHtml(p.name)}"
+           alt=""
            loading="lazy"
-           onerror="this.src='assets/placeholder.png'">
+           onerror="this.onerror=null;this.src='assets/placeholder.png'">
       <div class="wall-name">${escapeHtml(p.name)}</div>
       <div class="wall-college" style="color:${escapeHtml(p.color)}">
         ${escapeHtml(p.college_name)}

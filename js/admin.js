@@ -527,8 +527,6 @@ function bindEvents() {
         ?.addEventListener('click', loadReports);
     document.getElementById('btn-refresh-logs')
         ?.addEventListener('click', loadLogs);
-    document.getElementById('btn-clear-logs')
-        ?.addEventListener('click', clearLogs);
 }
 
 // ============ 审计日志 ============
@@ -554,35 +552,8 @@ async function loadLogs() {
             <span class="admin-name">${escapeHtml(actionMap[log.action] || log.action)}</span>
             <span class="admin-meta">${escapeHtml(log.admin_email || '系统')} · ${formatTime(log.created_at)}</span>
             <span class="admin-meta">${escapeHtml(JSON.stringify(log.details || {}))}</span>
-            <button class="btn-mini btn-warn" data-delete-log="${log.id}">删除</button>
         </div>
     `).join('');
-
-    el.querySelectorAll('[data-delete-log]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            if (!confirm('确定删除这条日志？')) return;
-            const { data: res, error: err } = await supabase.rpc('admin_delete_audit_log', {
-                p_log_id: btn.dataset.deleteLog,
-            });
-            if (err || res?.error) {
-                showMessage('删除失败：' + (err?.message || res?.error), 'error');
-                return;
-            }
-            showMessage('已删除', 'success');
-            loadLogs();
-        });
-    });
-}
-
-async function clearLogs() {
-    if (!confirm('确定清空所有审计日志？此操作不可恢复。')) return;
-    const { data, error } = await supabase.rpc('admin_clear_audit_logs');
-    if (error || data?.error) {
-        showMessage('清空失败：' + (error?.message || data?.error), 'error');
-        return;
-    }
-    showMessage('已清空所有日志', 'success');
-    loadLogs();
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

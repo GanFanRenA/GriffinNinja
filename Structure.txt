@@ -1,391 +1,302 @@
-# NinjaTag 项目文档
-
+================================================================
+NinjaTag 项目文档（完整版）
 生成日期：2026-10-10
 项目路径：C:\Users\samzh\Desktop\GriffinNinja
+================================================================
 
----
+================================================================
+一、游戏规则
+================================================================
 
-## 一、项目概述
+1. 基本玩法
+   - 校内线下追逐淘汰活动，为期 5 天。
+   - 每人有一个“当前目标”，所有参与者构成一个全局单向环。
+   - 淘汰目标后，猎人继承目标的目标，直到只剩 1 人。
+   - 参与者按学院分为四个阵营：Red、Yellow、Blue、Green。
+   - 每次有效击杀，击杀者阵营 +1 分（管理员可选择是否加分）。
+   - 玩家击杀时需要输入目标本人的 6 位代码。
+   - 管理员可在全局链中直接执行击杀，并选择是否给对应学院加分。
 
-NinjaTag 是校内线下追逐淘汰活动。每人有一个目标，形成全局单向环。淘汰目标后继承目标的目标，直到只剩一人。活动为期 5 天，参与者按学院分为四个阵营。每次有效击杀，击杀者阵营 +1 分。
+2. 事件生命周期
+   draft（未开始）→ active（进行中）↔ paused（暂停）→ ended（已结束）
+   - 开始活动：重置所有人状态为 alive，生成代码，随机生成环，学院分归零，状态改为 active。
+   - 暂停：状态改为 paused，击杀被拒绝。
+   - 继续：状态改为 active。
+   - 结束：状态改为 ended，标记赢家。
+   - 重新打乱：只对存活者重新生成环。
+   - 重启游戏（再次点击“开始活动”）：删除所有击杀记录，清空每个人的“已击杀列表”，重置参与者状态，重新生成代码和环。
 
-技术栈：
-- 前端：纯 HTML + CSS + JS（ES Module）
-- 后端：Supabase（PostgreSQL + Auth + Storage）
-- 部署：静态站点，本地用 python3 -m http.server 8080
+3. 击杀流程（玩家）
+   1. 猎人点击击杀当前目标。
+   2. 输入目标本人的代码。
+   3. 服务端事务：
+      - 校验事件为 active。
+      - 锁定猎人和目标。
+      - 校验猎人存活。
+      - 校验目标存活且是猎人当前目标。
+      - 校验输入代码等于目标本人的代码。
+      - 标记目标淘汰。
+      - 猎人继承目标的目标。
+      - 猎人学院 +1 分。
+      - 写击杀记录。
+      - 胜利判定。
+   4. 返回结果。
 
----
+4. 击杀流程（管理员）
+   - 管理员在“全局链”页面，对存活者点击“击杀+加分”或“击杀不加分”。
+   - 服务端事务与玩家击杀类似，但不校验目标代码。
+   - 击杀记录中 input_code = 'ADMIN'，points_awarded 为 1 或 0。
+   - 写入审计日志。
 
-## 二、已完成功能
+5. 胜利判定
+   - 只剩 1 人存活 → 该人获胜，事件结束。
+   - 或猎人新目标是自己 → 猎人获胜，事件结束。
+   - 获胜者 current_target_id 置为 null，status = 'winner'。
+   - 事件 status = 'ended'，end_at = now()。
 
-### 1. 数据库
-- 7 张表已建：colleges、events、participants、eliminations、reports、daily_rules、admins
-- 索引已建
-- RLS 已开启
-- is_admin() 辅助函数已创建
-- current_user_email()、current_participant_id()、current_event_id()、is_school_email() 已创建
-- 初始数据：4 个学院（红黄蓝绿）、1 个管理员、1 个事件
+6. 撤销击杀
+   - 只允许撤销最近一次有效击杀。
+   - 恢复被淘汰者。
+   - 恢复猎人目标。
+   - 扣学院分（按 points_awarded 扣）。
+   - 标记 status = 'revoked'。
 
-### 2. RPC 函数
-公共/玩家侧：
-- get_public_home()：返回公共主页数据
-- get_my_profile()：返回个人页数据
-- confirm_identity()：身份确认
-- report_identity_issue(text)：上报身份异常
-- kill_target(uuid, text)：击杀事务
-- submit_report(uuid, text, text, text)：提交举报
+7. 举报流程
+   - 玩家提交 → 进 reports 表。
+   - 管理员查看（可见举报人）。
+   - 处理：resolved / rejected。
+   - 不可删除。
 
-管理员侧：
-- admin_add_participant
-- admin_update_participant
-- admin_delete_participant
-- admin_import_participants
-- admin_get_colleges
-- admin_update_college
-- admin_get_event
-- admin_update_event
-- admin_get_daily_rules
-- admin_generate_codes_and_ring（旧，已被 admin_start_event 取代，可删除）
-- admin_start_event：开始活动，重置状态+生成代码+生成环
-- admin_reshuffle_alive：只对存活者重新生成环
-- admin_pause_event：暂停
-- admin_resume_event：继续
-- admin_end_event(text)：输入"结束活动"确认
-- admin_revoke_kill
-- admin_adjust_college_score
-- admin_reset_college_scores
-- admin_set_event_status（旧，可删除）
-- admin_publish_daily_rule
-- admin_get_reports
-- admin_handle_report
-- admin_get_participants
-- admin_get_eliminations
-- admin_get_global_chain
+8. 身份确认
+   - 首次登录需确认身份。
+   - 显示姓名、照片、学院。
+   - “这是我” → confirm_identity() → 进入个人页。
+   - “这不是我” → report_identity_issue() → 退出登录。
 
-### 3. 前端页面
-- index.html：公共主页（事件状态、阵营分、存活墙、人数、今日规则、赢家）
-- login.html：登录页（Magic Link + 测试密码登录）
-- confirm.html：首次身份确认
-- me.html：个人页（我的代码、当前目标、击杀、举报、我已淘汰的人、我的状态）
-- admin.html：管理后台（事件、学院、参与者、每日规则、全局链、击杀记录、举报）
+9. 每日规则
+   - 管理员发布每日规则（Day 1-5）。
+   - 公共主页显示今日规则。
 
-### 4. 前端 JS
-- js/supabase.js：Supabase 客户端
-- js/utils.js：通用工具
-- js/auth.js：会话、管理员判断、路由
-- js/public.js：公共主页，5 秒轮询
-- js/login.js：登录逻辑
-- js/confirm.js：身份确认
-- js/me.js：个人页逻辑
-- js/admin.js：管理后台逻辑
+10. 审计日志
+    - 记录管理员关键操作：开始活动、管理员击杀等。
+    - 管理员可查看、删除单条日志、清空所有日志。
 
-### 5. 样式
-- css/style.css：移动端优先，深色主题
+================================================================
+二、已完成功能
+================================================================
 
-### 6. Storage
-- photos 桶：公开，玩家照片
-- evidence 桶：私有，举报证据
+1. 数据库
+   - 表：colleges、events、participants、eliminations、reports、daily_rules、admins、audit_logs
+   - 索引已建，RLS 已开启。
+   - 辅助函数：is_admin()、current_user_email()、current_participant_id()、current_event_id()、is_school_email()。
+   - 初始数据：4 个学院（Red、Yellow、Blue、Green）、1 个管理员、1 个事件。
 
-### 7. Auth
-- 学校邮箱域名限制：@bjsmicschool.com
-- Magic Link + 测试密码登录
-- 首次确认后跳转对应页面
+2. RPC 函数
+   公共/玩家侧：
+   - get_public_home()：公共主页数据
+   - get_my_profile()：个人页数据
+   - confirm_identity()：身份确认
+   - report_identity_issue(text)：上报身份异常
+   - kill_target(uuid, text)：玩家击杀事务
+   - submit_report(uuid, text, text, text)：提交举报
 
-### 8. 核心业务逻辑
-- 击杀验证：输入目标本人的代码
-- 击杀继承：猎人继承目标的目标
-- 阵营 +1 分
-- 胜利判定：只剩 1 人存活，或猎人新目标是自己
-- 最后两人场景：自动兼容
-- 暂停时不能击杀
-- 撤销击杀：恢复环、扣分
-- 举报不删除，所有管理员可见
+   管理员侧：
+   - admin_add_participant
+   - admin_update_participant
+   - admin_delete_participant
+   - admin_import_participants
+   - admin_get_colleges
+   - admin_update_college
+   - admin_get_event
+   - admin_update_event
+   - admin_get_daily_rules
+   - admin_start_event：开始活动（重置+生成代码+生成环+清空击杀记录+写审计日志）
+   - admin_reshuffle_alive：只对存活者重新生成环
+   - admin_pause_event：暂停
+   - admin_resume_event：继续
+   - admin_end_event(text)：结束活动
+   - admin_revoke_kill：撤销击杀
+   - admin_adjust_college_score：加减学院分
+   - admin_reset_college_scores：重置学院分
+   - admin_publish_daily_rule：发布每日规则
+   - admin_get_reports
+   - admin_handle_report
+   - admin_get_participants
+   - admin_get_eliminations
+   - admin_get_global_chain
+   - admin_kill_target(uuid, boolean)：管理员在全局链中击杀，可选择是否加分
+   - admin_get_audit_logs()：获取审计日志
+   - admin_delete_audit_log(uuid)：删除单条日志
+   - admin_clear_audit_logs()：清空所有日志
 
----
+3. 前端页面
+   - index.html：公共主页（事件状态、阵营分、存活墙、人数、今日规则、赢家）
+   - login.html：登录页（Magic Link + 测试密码登录）
+   - confirm.html：首次身份确认
+   - me.html：个人页（我的代码、当前目标、击杀、举报、我已淘汰的人、我的状态）
+   - admin.html：管理后台（事件、学院、参与者、每日规则、全局链、击杀记录、举报、审计日志）
 
-## 三、未完成功能
+4. 前端 JS
+   - js/supabase.js：Supabase 客户端
+   - js/utils.js：通用工具
+   - js/auth.js：会话、管理员判断、路由
+   - js/public.js：公共主页，5 秒轮询
+   - js/login.js：登录逻辑
+   - js/confirm.js：身份确认
+   - js/me.js：个人页逻辑
+   - js/admin.js：管理后台逻辑（含审计日志、管理员击杀）
 
-### 1. 照片上传
-- 目前照片通过 URL 手动填写
-- 未接入 Storage 上传
-- 未做照片压缩为 WebP
+5. 样式
+   - css/style.css：移动端优先，深色主题
 
-### 2. 举报证据上传
-- evidence 桶已建，但前端未接入
-- 举报表单未加文件上传
+6. Storage
+   - photos 桶：公开，玩家照片
+   - evidence 桶：私有，举报证据
 
-### 3. 实时更新
-- 公共主页目前为 5 秒轮询
-- 未升级为 Supabase Realtime
+7. Auth
+   - 学校邮箱域名限制：@bjsmicschool.com
+   - Magic Link + 测试密码登录
+   - 首次确认后跳转对应页面
 
-### 4. 邮件配置
-- Resend 域名验证中（pending）
-- Supabase SMTP 未配置
-- Magic Link 受内置邮件频率限制
+8. 核心业务逻辑
+   - 击杀验证：输入目标本人的代码
+   - 击杀继承：猎人继承目标的目标
+   - 阵营 +1 分（管理员击杀可选择加分）
+   - 胜利判定：只剩 1 人存活，或猎人新目标是自己
+   - 最后两人场景：自动兼容
+   - 暂停时不能击杀
+   - 撤销击杀：恢复环、扣分
+   - 举报不删除，所有管理员可见
+   - 重启游戏清空击杀记录和“已击杀列表”
+   - 审计日志记录关键操作，可查看、删除、清空
 
-### 5. 审计日志
-- audit_logs 表未建
-- 关键操作未写日志
+9. 未完成功能（简要）
+   - 照片上传接入 Storage
+   - 举报证据上传
+   - Supabase Realtime 实时更新
+   - 邮件配置（Resend SMTP）
+   - PWA
+   - 数据导出 CSV
+   - 限流与安全加固
+   - 部署到生产环境（已部署 Cloudflare Pages，域名已绑定）
+   - 自动备份
 
-### 6. 公告
-- announcements 表未建
-- 后台无公告管理
+================================================================
+三、表的内容和关系
+================================================================
 
-### 7. 击杀尝试记录
-- kill_attempts 表未建
-- 失败次数无限制
-- 无限流
+1. colleges（学院表，兼阵营）
+   字段：
+   - id uuid 主键
+   - name text 学院名，唯一
+   - color_hex text 颜色
+   - score integer 学院分（=阵营分）
+   - created_at timestamptz
+   - updated_at timestamptz
+   初始数据：Red、Yellow、Blue、Green
 
-### 8. 学院独立分数
-- 目前 college 表同时代表阵营
-- 学院分和阵营分未区分（按需求已合并）
+2. events（事件表）
+   字段：
+   - id uuid 主键
+   - name text 事件名
+   - status text draft / active / paused / ended
+   - start_at timestamptz
+   - end_at timestamptz
+   - current_day integer 1-5
+   - created_at timestamptz
+   - updated_at timestamptz
 
-### 9. PWA
-- 未加 manifest.json
-- 未加 Service Worker
+3. participants（参与者表）
+   字段：
+   - id uuid 主键
+   - event_id uuid → events.id
+   - email text 学校邮箱，唯一
+   - name text 姓名
+   - photo_url text 照片
+   - college_id uuid → colleges.id
+   - code text 唯一代码（6位，排除 O0I1L）
+   - status text alive / eliminated / winner
+   - current_target_id uuid → participants.id
+   - eliminated_by_id uuid → participants.id
+   - eliminated_at timestamptz
+   - is_confirmed boolean
+   - confirmed_at timestamptz
+   - created_at timestamptz
+   - updated_at timestamptz
+   约束：email 唯一、code 唯一、current_target_id <> id
 
-### 10. 移动端优化
-- 大按钮和单手操作可进一步优化
-- 图片懒加载已加，但遇到抽搐问题（已通过缓存指纹解决）
+4. eliminations（击杀记录表）
+   字段：
+   - id uuid 主键
+   - event_id uuid → events.id
+   - hunter_id uuid → participants.id
+   - target_id uuid → participants.id
+   - hunter_college_id uuid → colleges.id
+   - target_college_id uuid → colleges.id
+   - input_code text 输入的代码（管理员击杀为 'ADMIN'）
+   - points_awarded integer 固定 1 或 0
+   - status text valid / revoked
+   - created_at timestamptz
+   - revoked_at timestamptz
+   - revoked_by uuid → admins.id
+   - revoke_reason text
 
-### 11. 数据导出
-- 未实现 CSV 导出
+5. reports（举报表）
+   字段：
+   - id uuid 主键
+   - event_id uuid → events.id
+   - reporter_id uuid → participants.id
+   - target_id uuid → participants.id
+   - reason text
+   - description text
+   - evidence_url text
+   - status text pending / resolved / rejected
+   - admin_note text
+   - handled_by uuid → admins.id
+   - handled_at timestamptz
+   - created_at timestamptz
 
-### 12. 安全加固
-- 击杀接口无限流
-- 登录接口无限流
-- 举报接口无限流
-- 无 IP 记录
+6. daily_rules（每日规则表）
+   字段：
+   - id uuid 主键
+   - event_id uuid → events.id
+   - day_number integer 1-5
+   - date date
+   - title text
+   - content text
+   - published boolean
+   - created_by uuid → admins.id
+   - created_at timestamptz
+   - updated_at timestamptz
+   唯一约束：event_id + day_number
 
-### 13. 部署
-- 未部署到生产环境
-- 未配置域名
-- 未配置 CDN
+7. admins（管理员表）
+   字段：
+   - id uuid 主键
+   - email text 管理员邮箱，唯一
+   - name text 姓名
+   - created_at timestamptz
+   - updated_at timestamptz
 
-### 14. 备份
-- 未做自动备份
-- 未做活动前快照
+8. audit_logs（审计日志表）
+   字段：
+   - id uuid 主键
+   - event_id uuid → events.id ON DELETE SET NULL
+   - admin_id uuid → admins.id ON DELETE SET NULL
+   - admin_email text
+   - action text NOT NULL
+   - details jsonb DEFAULT '{}'::jsonb
+   - created_at timestamptz DEFAULT now()
+   索引：event_id、created_at DESC
+   RLS：仅管理员可读、可删除
 
-### 15. 文档
-- 管理员操作手册未写
-- 玩家使用指南未写
-
----
-
-## 四、权限设定
-
-### 1. 未登录访客
-- 可访问：公共主页
-- 可见：事件状态、阵营分、存活墙、人数、今日规则、赢家
-- 不可见：任何人的目标信息、代码
-- 不可操作：击杀、举报、进入个人页
-
-### 2. 玩家（已登录且已确认）
-- 可访问：个人页
-- 可见：自己的代码、当前目标、已淘汰的人、自己的状态
-- 可操作：击杀、举报
-- 不可见：他人目标、他人代码
-- 不可修改：个人资料、学院、阵营、代码、分数、规则
-
-### 3. 管理员
-- 可访问：全部页面
-- 可修改：所有数据
-- 可操作：导入、编辑、删除参与者、上传照片、设置学院、生成代码和环、开始/暂停/结束活动、发布规则、处理举报、撤销击杀、加减分、重置分、导出数据
-
-### 4. 系统
-- 发送登录邮件
-- 生成唯一代码
-- 生成随机环
-- 校验击杀代码
-- 事务更新环、状态、分数
-
-### 5. RLS 策略
-- colleges：匿名可读，管理员可写
-- events：匿名可读，管理员可写
-- daily_rules：匿名只能读已发布，管理员可写
-- participants：玩家只能读自己，管理员全读全写
-- admins：仅管理员可读
-- eliminations：玩家只能读自己作为猎人的记录，管理员全读全写
-- reports：玩家可 insert，管理员可读可更新，不可删除
-
-### 6. Storage 策略
-- photos：匿名可读，管理员可写
-- evidence：玩家可上传，仅管理员可读
-
----
-
-## 五、运行逻辑
-
-### 1. 事件生命周期
-draft（未开始）→ active（进行中）↔ paused（暂停）→ ended（已结束）
-
-- 开始活动：admin_start_event，重置所有人状态为 alive，生成代码，随机生成环，学院分归零，状态改为 active
-- 暂停：admin_pause_event，状态改为 paused，击杀被拒
-- 继续：admin_resume_event，状态改为 active
-- 结束：admin_end_event('结束活动')，状态改为 ended
-- 重新打乱：admin_reshuffle_alive，只对存活者重新生成环
-
-### 2. 登录流程
-1. 输入学校邮箱
-2. 发送 Magic Link 或使用密码登录
-3. 登录后判断：
-   - 管理员 → admin.html
-   - 已确认玩家 → me.html
-   - 未确认玩家 → confirm.html
-
-### 3. 身份确认
-1. 根据邮箱查 participants
-2. 显示姓名、照片、学院
-3. "这是我" → confirm_identity() → me.html
-4. "这不是我" → report_identity_issue() → 退出登录
-
-### 4. 击杀流程
-1. 猎人点击击杀当前目标
-2. 输入目标本人的代码
-3. 服务端事务：
-   - 校验事件 active
-   - 锁定猎人和目标
-   - 校验猎人存活
-   - 校验目标存活且是猎人当前目标
-   - 校验输入代码等于目标本人的代码
-   - 标记目标淘汰
-   - 猎人继承目标的目标
-   - 猎人学院 +1
-   - 写击杀记录
-   - 胜利判定
-4. 返回结果
-
-### 5. 胜利判定
-- 只剩 1 人存活 → 猎人获胜，事件结束
-- 猎人新目标是自己 → 猎人获胜，事件结束
-- 获胜者 current_target_id 置为 null
-
-### 6. 撤销击杀
-- 只允许撤销最近一次有效击杀
-- 恢复被淘汰者
-- 恢复猎人目标
-- 扣学院分
-- 标记 status = revoked
-
-### 7. 举报流程
-- 玩家提交 → 进 reports 表
-- 管理员查看（可见举报人）
-- 处理：resolved / rejected
-- 不可删除
-
----
-
-## 六、表的数据和关系
-
-### 1. colleges（学院表，兼阵营）
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| id | uuid | 主键 |
-| name | text | 学院名，唯一 |
-| color_hex | text | 颜色 |
-| score | integer | 学院分（=阵营分） |
-| created_at | timestamptz | 创建时间 |
-| updated_at | timestamptz | 更新时间 |
-
-初始数据：Red、Yellow、Blue、Green
-
-### 2. events（事件表）
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| id | uuid | 主键 |
-| name | text | 事件名 |
-| status | text | draft / active / paused / ended |
-| start_at | timestamptz | 开始时间 |
-| end_at | timestamptz | 结束时间 |
-| current_day | integer | 当前天数 1-5 |
-| created_at | timestamptz | 创建时间 |
-| updated_at | timestamptz | 更新时间 |
-
-### 3. participants（参与者表）
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| id | uuid | 主键 |
-| event_id | uuid | → events.id |
-| email | text | 学校邮箱，唯一 |
-| name | text | 姓名 |
-| photo_url | text | 照片 |
-| college_id | uuid | → colleges.id |
-| code | text | 唯一代码 |
-| status | text | alive / eliminated / winner |
-| current_target_id | uuid | → participants.id |
-| eliminated_by_id | uuid | → participants.id |
-| eliminated_at | timestamptz | 淘汰时间 |
-| is_confirmed | boolean | 是否确认身份 |
-| confirmed_at | timestamptz | 确认时间 |
-| created_at | timestamptz | 创建时间 |
-| updated_at | timestamptz | 更新时间 |
-
-约束：email 唯一、code 唯一、current_target_id <> id
-
-### 4. eliminations（击杀记录表）
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| id | uuid | 主键 |
-| event_id | uuid | → events.id |
-| hunter_id | uuid | → participants.id |
-| target_id | uuid | → participants.id |
-| hunter_college_id | uuid | → colleges.id |
-| target_college_id | uuid | → colleges.id |
-| input_code | text | 输入的代码 |
-| points_awarded | integer | 固定 1 |
-| status | text | valid / revoked |
-| created_at | timestamptz | 击杀时间 |
-| revoked_at | timestamptz | 撤销时间 |
-| revoked_by | uuid | → admins.id |
-| revoke_reason | text | 撤销原因 |
-
-### 5. reports（举报表）
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| id | uuid | 主键 |
-| event_id | uuid | → events.id |
-| reporter_id | uuid | → participants.id |
-| target_id | uuid | → participants.id |
-| reason | text | 原因 |
-| description | text | 描述 |
-| evidence_url | text | 证据 |
-| status | text | pending / resolved / rejected |
-| admin_note | text | 管理员备注 |
-| handled_by | uuid | → admins.id |
-| handled_at | timestamptz | 处理时间 |
-| created_at | timestamptz | 提交时间 |
-
-### 6. daily_rules（每日规则表）
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| id | uuid | 主键 |
-| event_id | uuid | → events.id |
-| day_number | integer | 1-5 |
-| date | date | 日期 |
-| title | text | 标题 |
-| content | text | 内容 |
-| published | boolean | 是否发布 |
-| created_by | uuid | → admins.id |
-| created_at | timestamptz | 创建时间 |
-| updated_at | timestamptz | 更新时间 |
-
-唯一约束：event_id + day_number
-
-### 7. admins（管理员表）
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| id | uuid | 主键 |
-| email | text | 管理员邮箱，唯一 |
-| name | text | 姓名 |
-| created_at | timestamptz | 创建时间 |
-| updated_at | timestamptz | 更新时间 |
-
-### 表关系
+表关系：
 - colleges 1:N participants
 - events 1:N participants
 - events 1:N eliminations
 - events 1:N reports
 - events 1:N daily_rules
+- events 1:N audit_logs
 - participants 自关联：current_target_id、eliminated_by_id
 - eliminations N:1 participants（hunter）
 - eliminations N:1 participants（target）
@@ -394,75 +305,418 @@ draft（未开始）→ active（进行中）↔ paused（暂停）→ ended（�
 - reports N:1 participants（reporter、target）
 - reports N:1 admins（handled_by）
 - daily_rules N:1 admins（created_by）
+- audit_logs N:1 admins（admin_id）
 
-### 视图
+视图：
 - public_home_view：公共主页数据
 - public_alive_wall_view：存活墙
 
----
+================================================================
+四、职责划分
+================================================================
 
-## 七、其他项目数据
+1. 未登录访客
+   - 可访问：公共主页
+   - 可见：事件状态、阵营分、存活墙、人数、今日规则、赢家
+   - 不可见：任何人的目标信息、代码
+   - 不可操作：击杀、举报、进入个人页
 
-### 1. Supabase 项目
-- Project URL：https://pyeqijsawxypsgnnygtu.supabase.co
-- Region：待确认（新加坡或东京）
-- 前端 Key：sb_publishable_io8yAlVAMLrIyY9M6puW7g_gsAKm2d0
-- Service Role Key：仅本地脚本使用，不进前端
+2. 玩家（已登录且已确认）
+   - 可访问：个人页
+   - 可见：自己的代码、当前目标、已淘汰的人、自己的状态
+   - 可操作：击杀、举报
+   - 不可见：他人目标、他人代码
+   - 不可修改：个人资料、学院、阵营、代码、分数、规则
 
-### 2. Auth 配置
-- Provider：Email（Magic Link + Password）
-- 学校邮箱域名：@bjsmicschool.com
-- Site URL：http://localhost:8080（开发）
-- Redirect URLs：http://localhost:8080/login.html
-- 管理员邮箱：280028@bjsmicschool.com
-- 测试账号：test1@bjsmicschool.com / test123456
+3. 管理员
+   - 可访问：全部页面
+   - 可修改：所有数据
+   - 可操作：导入、编辑、删除参与者、上传照片、设置学院、生成代码和环、开始/暂停/结束活动、发布规则、处理举报、撤销击杀、加减分、重置分、导出数据、全局链中击杀、查看/删除/清空审计日志
 
-### 3. Storage 桶
-- photos：公开，参与者照片
-- evidence：私有，举报证据
+4. 系统
+   - 发送登录邮件
+   - 生成唯一代码
+   - 生成随机环
+   - 校验击杀代码
+   - 事务更新环、状态、分数
+   - 写审计日志
 
-### 4. 邮件服务
-- Resend：域名验证中（pending）
-- 计划 SMTP：
-  - Host：smtp.resend.com
-  - Port：465
-  - Username：resend
-  - Password：Resend API Key
-  - Sender email：noreply@mail.<域名>
-  - Sender name：NinjaTag
+5. RLS 策略
+   - colleges：匿名可读，管理员可写
+   - events：匿名可读，管理员可写
+   - daily_rules：匿名只能读已发布，管理员可写
+   - participants：玩家只能读自己，管理员全读全写
+   - admins：仅管理员可读
+   - eliminations：玩家只能读自己作为猎人的记录，管理员全读全写
+   - reports：玩家可 insert，管理员可读可更新，不可删除
+   - audit_logs：仅管理员可读、可删除
 
-### 5. 本地开发
-- 启动命令：python3 -m http.server 8080
-- 访问地址：http://localhost:8080
-- 项目目录：C:\Users\samzh\Desktop\GriffinNinja
+6. Storage 策略
+   - photos：匿名可读，管理员可写
+   - evidence：玩家可上传，仅管理员可读
 
-### 6. 常量
-- 阵营：Red、Yellow、Blue、Green
-- 代码格式：6 位大写字母 + 数字，排除易混淆字符 O0I1L
-- 事件天数：1-5
-- 击杀分：固定 +1
-- 每日规则：
-  - Day 1-2：无规则
-  - Day 3：必须杀一个人（仅文本，不实现逻辑）
-  - Day 4：SpecialBoss（仅文本，不实现逻辑）
-  - Day 5：待定
+================================================================
+五、部分重要的 SQL 代码
+================================================================
 
-### 7. 已知问题
-- Magic Link 受 Supabase 内置邮件频率限制（每小时 2 封）
-- 域名验证 pending 中，暂时只能用密码登录测试
-- 图片懒加载导致的抽搐已通过缓存指纹解决
-- 无审计日志、无公告、无限流
+1. 创建审计日志表
+----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id uuid REFERENCES events(id) ON DELETE SET NULL,
+  admin_id uuid REFERENCES admins(id) ON DELETE SET NULL,
+  admin_email text,
+  action text NOT NULL,
+  details jsonb DEFAULT '{}'::jsonb,
+  created_at timestamptz DEFAULT now()
+);
 
-### 8. 下一步计划
-1. 域名验证完成后配置 SMTP
-2. 照片上传接入 Storage
-3. 举报证据上传
-4. 端到端测试（多账号击杀链）
-5. 并发测试（双杀验证）
-6. 实时更新（Supabase Realtime）
-7. PWA
-8. 部署上线
+CREATE INDEX IF NOT EXISTS idx_audit_logs_event_id ON audit_logs(event_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
 
----
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Admins can read audit logs" ON audit_logs;
+CREATE POLICY "Admins can read audit logs" ON audit_logs
+  FOR SELECT USING (is_admin());
+
+DROP POLICY IF EXISTS "Admins can delete audit logs" ON audit_logs;
+CREATE POLICY "Admins can delete audit logs" ON audit_logs
+  FOR DELETE USING (is_admin());
+
+2. admin_start_event（开始活动，含清空击杀记录、审计日志）
+----------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.admin_start_event()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  v_event_id uuid;
+  v_count integer;
+  v_ids uuid[];
+  v_codes text[] := ARRAY[]::text[];
+  v_code text;
+  v_i integer;
+  v_j integer;
+  v_tmp uuid;
+  v_alphabet text := 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  v_code_len integer := 6;
+  v_elim_count integer;
+  v_attempts integer;
+BEGIN
+  IF NOT is_admin() THEN
+    RETURN jsonb_build_object('error', 'not_admin');
+  END IF;
+
+  SELECT id INTO v_event_id
+  FROM events
+  ORDER BY created_at DESC
+  LIMIT 1;
+
+  IF v_event_id IS NULL THEN
+    RETURN jsonb_build_object('error', 'no_event');
+  END IF;
+
+  SELECT count(*) INTO v_count
+  FROM participants
+  WHERE event_id = v_event_id;
+
+  IF v_count < 2 THEN
+    RETURN jsonb_build_object(
+      'error', 'need_at_least_2_participants',
+      'count', v_count
+    );
+  END IF;
+
+  SELECT count(*) INTO v_elim_count
+  FROM eliminations
+  WHERE event_id = v_event_id;
+
+  INSERT INTO audit_logs (event_id, admin_id, admin_email, action, details)
+  VALUES (
+    v_event_id,
+    (SELECT id FROM admins WHERE email = current_user_email()),
+    current_user_email(),
+    'start_event',
+    jsonb_build_object(
+      'deleted_eliminations', v_elim_count,
+      'participant_count', v_count,
+      'timestamp', now()
+    )
+  );
+
+  DELETE FROM eliminations WHERE event_id = v_event_id;
+
+  UPDATE participants
+  SET
+    status = 'alive',
+    eliminated_by_id = NULL,
+    eliminated_at = NULL,
+    current_target_id = NULL,
+    code = NULL,
+    updated_at = now()
+  WHERE event_id = v_event_id;
+
+  UPDATE colleges
+  SET score = 0, updated_at = now()
+  WHERE score <> 0;
+
+  SELECT array_agg(id) INTO v_ids
+  FROM participants
+  WHERE event_id = v_event_id;
+
+  FOR v_i IN 1..v_count LOOP
+    v_attempts := 0;
+    LOOP
+      v_code := '';
+      FOR v_j IN 1..v_code_len LOOP
+        v_code := v_code || substr(
+          v_alphabet,
+          floor(random() * length(v_alphabet))::int + 1,
+          1
+        );
+      END LOOP;
+      v_attempts := v_attempts + 1;
+      EXIT WHEN NOT (v_code = ANY(v_codes));
+      IF v_attempts > 200 THEN
+        RAISE EXCEPTION '无法生成唯一代码，请检查参与者数量或字母表';
+      END IF;
+    END LOOP;
+    v_codes := array_append(v_codes, v_code);
+    UPDATE participants
+    SET code = v_code, updated_at = now()
+    WHERE id = v_ids[v_i];
+  END LOOP;
+
+  FOR v_i IN REVERSE v_count..2 LOOP
+    v_j := 1 + floor(random() * v_i)::int;
+    v_tmp := v_ids[v_i];
+    v_ids[v_i] := v_ids[v_j];
+    v_ids[v_j] := v_tmp;
+  END LOOP;
+
+  FOR v_i IN 1..v_count LOOP
+    UPDATE participants
+    SET current_target_id = v_ids[(v_i % v_count) + 1],
+        updated_at = now()
+    WHERE id = v_ids[v_i];
+  END LOOP;
+
+  UPDATE events
+  SET
+    status = 'active',
+    start_at = now(),
+    end_at = NULL,
+    current_day = 1,
+    updated_at = now()
+  WHERE id = v_event_id;
+
+  RETURN jsonb_build_object('success', true, 'count', v_count);
+END;
+$function$;
+
+3. admin_kill_target（管理员在全局链中击杀）
+----------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.admin_kill_target(
+  p_hunter_id uuid,
+  p_award_points boolean DEFAULT true
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  v_event_id uuid;
+  v_event_status text;
+  v_hunter participants%ROWTYPE;
+  v_target participants%ROWTYPE;
+  v_alive_count integer;
+  v_points integer := 0;
+  v_winner_name text;
+BEGIN
+  IF NOT is_admin() THEN
+    RETURN jsonb_build_object('error', 'not_admin');
+  END IF;
+
+  SELECT id, status INTO v_event_id, v_event_status
+  FROM events
+  ORDER BY created_at DESC
+  LIMIT 1;
+
+  IF v_event_id IS NULL THEN
+    RETURN jsonb_build_object('error', 'no_event');
+  END IF;
+
+  IF v_event_status <> 'active' THEN
+    RETURN jsonb_build_object('error', 'event_not_active');
+  END IF;
+
+  SELECT * INTO v_hunter
+  FROM participants
+  WHERE id = p_hunter_id
+  FOR UPDATE;
+
+  IF v_hunter.id IS NULL THEN
+    RETURN jsonb_build_object('error', 'hunter_not_found');
+  END IF;
+  IF v_hunter.status <> 'alive' THEN
+    RETURN jsonb_build_object('error', 'hunter_not_alive');
+  END IF;
+  IF v_hunter.current_target_id IS NULL THEN
+    RETURN jsonb_build_object('error', 'hunter_no_target');
+  END IF;
+
+  SELECT * INTO v_target
+  FROM participants
+  WHERE id = v_hunter.current_target_id
+  FOR UPDATE;
+
+  IF v_target.id IS NULL THEN
+    RETURN jsonb_build_object('error', 'target_not_found');
+  END IF;
+  IF v_target.status <> 'alive' THEN
+    RETURN jsonb_build_object('error', 'target_already_eliminated');
+  END IF;
+
+  UPDATE participants
+  SET status = 'eliminated',
+      eliminated_by_id = v_hunter.id,
+      eliminated_at = now(),
+      updated_at = now()
+  WHERE id = v_target.id;
+
+  UPDATE participants
+  SET current_target_id = v_target.current_target_id,
+      updated_at = now()
+  WHERE id = v_hunter.id;
+
+  IF p_award_points THEN
+    v_points := 1;
+    UPDATE colleges
+    SET score = score + 1, updated_at = now()
+    WHERE id = v_hunter.college_id;
+  END IF;
+
+  INSERT INTO eliminations (
+    event_id, hunter_id, target_id,
+    hunter_college_id, target_college_id,
+    input_code, points_awarded, status, created_at
+  ) VALUES (
+    v_event_id, v_hunter.id, v_target.id,
+    v_hunter.college_id, v_target.college_id,
+    'ADMIN', v_points, 'valid', now()
+  );
+
+  INSERT INTO audit_logs (event_id, admin_id, admin_email, action, details)
+  VALUES (
+    v_event_id,
+    (SELECT id FROM admins WHERE email = current_user_email()),
+    current_user_email(),
+    'admin_kill',
+    jsonb_build_object(
+      'hunter_name', v_hunter.name,
+      'target_name', v_target.name,
+      'award_points', p_award_points,
+      'timestamp', now()
+    )
+  );
+
+  SELECT count(*) INTO v_alive_count
+  FROM participants
+  WHERE event_id = v_event_id AND status = 'alive';
+
+  IF v_alive_count = 1 THEN
+    UPDATE participants
+    SET status = 'winner',
+        current_target_id = NULL,
+        updated_at = now()
+    WHERE event_id = v_event_id AND status = 'alive';
+
+    UPDATE events
+    SET status = 'ended',
+        end_at = now(),
+        updated_at = now()
+    WHERE id = v_event_id;
+
+    SELECT name INTO v_winner_name
+    FROM participants
+    WHERE event_id = v_event_id AND status = 'winner'
+    LIMIT 1;
+
+    RETURN jsonb_build_object(
+      'success', true,
+      'winner', true,
+      'winner_name', v_winner_name
+    );
+  END IF;
+
+  RETURN jsonb_build_object('success', true, 'winner', false);
+END;
+$function$;
+
+4. 审计日志相关 RPC
+----------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.admin_get_audit_logs()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  v_logs jsonb;
+BEGIN
+  IF NOT is_admin() THEN
+    RETURN jsonb_build_object('error', 'not_admin');
+  END IF;
+
+  SELECT jsonb_agg(
+    jsonb_build_object(
+      'id', id,
+      'event_id', event_id,
+      'admin_email', admin_email,
+      'action', action,
+      'details', details,
+      'created_at', created_at
+    ) ORDER BY created_at DESC
+  ) INTO v_logs
+  FROM audit_logs;
+
+  RETURN COALESCE(v_logs, '[]'::jsonb);
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.admin_delete_audit_log(p_log_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+BEGIN
+  IF NOT is_admin() THEN
+    RETURN jsonb_build_object('error', 'not_admin');
+  END IF;
+
+  DELETE FROM audit_logs WHERE id = p_log_id;
+
+  RETURN jsonb_build_object('success', true);
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.admin_clear_audit_logs()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+BEGIN
+  IF NOT is_admin() THEN
+    RETURN jsonb_build_object('error', 'not_admin');
+  END IF;
+
+  DELETE FROM audit_logs WHERE id IS NOT NULL;
+
+  RETURN jsonb_build_object('success', true);
+END;
+$function$;
+
+================================================================
 文档结束
+================================================================

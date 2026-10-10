@@ -29,6 +29,7 @@ function loadTab(name) {
         chain: loadChain,
         eliminations: loadEliminations,
         reports: loadReports,
+        logs: loadLogs,
     };
     map[name]?.();
 }
@@ -372,8 +373,38 @@ async function loadChain() {
       <span class="admin-name">${escapeHtml(p.name)}</span>
       <span class="admin-meta">${escapeHtml(p.code || '-')} → ${escapeHtml(p.target_name || '无')} (${escapeHtml(p.target_code || '-')})</span>
       <span class="admin-meta">${escapeHtml(p.status)}</span>
+      ${p.status === 'alive' && p.target_name ? `
+        <button class="btn-mini btn-warn" data-admin-kill="${p.id}" data-award="1">击杀+加分</button>
+        <button class="btn-mini" data-admin-kill="${p.id}" data-award="0">击杀不加分</button>
+      ` : ''}
     </div>
   `).join('');
+
+    el.querySelectorAll('[data-admin-kill]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const hunterId = btn.dataset.adminKill;
+            const award = btn.dataset.award === '1';
+            const msg = award
+                ? '确认执行击杀，并给击杀者学院加 1 分？'
+                : '确认执行击杀（不加分）？';
+            if (!confirm(msg)) return;
+
+            const { data: res, error: err } = await supabase.rpc('admin_kill_target', {
+                p_hunter_id: hunterId,
+                p_award_points: award,
+            });
+            if (err || res?.error) {
+                showMessage('失败：' + (err?.message || res?.error), 'error');
+                return;
+            }
+            if (res?.winner) {
+                showMessage(`击杀成功！${res.winner_name || ''} 获胜，活动已结束。`, 'success');
+            } else {
+                showMessage('击杀成功', 'success');
+            }
+            loadChain();
+        });
+    });
 }
 
 // ============ 击杀记录 ============
@@ -494,6 +525,64 @@ function bindEvents() {
         ?.addEventListener('click', loadEliminations);
     document.getElementById('btn-refresh-reports')
         ?.addEventListener('click', loadReports);
+    document.getElementById('btn-refresh-logs')
+        ?.addEventListener('click', loadLogs);
+    document.getElementById('btn-clear-logs')
+        ?.addEventListener('click', clearLogs);
+}
+
+// ============ 审计日志 ============
+async function loadLogs() {
+    const { data, error } = await supabase.rpc('admin_get_audit_logs');
+    if (error || data?.error) {
+        document.getElementById('logs-list').textContent = '加载失败';
+        return;
+    }
+    const el = document.getElementById('logs-list');
+    if (!data || !data.length) {
+        el.innerHTML = '<p class="hint">暂无日志</p>';
+        return;
+    }
+
+    const actionMap = {
+        start_event: '开始活动',
+        admin_kill: '管理员击杀',
+    };
+
+    el.innerHTML = data.map(log => `
+        <div class="admin-row">
+            <span class="admin-name">${escapeHtml(actionMap[log.action] || log.action)}</span>
+            <span class="admin-meta">${escapeHtml(log.admin_email || '系统')} · ${formatTime(log.created_at)}</span>
+            <span class="admin-meta">${escapeHtml(JSON.stringify(log.details || {}))}</span>
+            <button class="btn-mini btn-warn" data-delete-log="${log.id}">删除</button>
+        </div>
+    `).join('');
+
+    el.querySelectorAll('[data-delete-log]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            if (!confirm('确定删除这条日志？')) return;
+            const { data: res, error: err } = await supabase.rpc('admin_delete_audit_log', {
+                p_log_id: btn.dataset.deleteLog,
+            });
+            if (err || res?.error) {
+                showMessage('删除失败：' + (err?.message || res?.error), 'error');
+                return;
+            }
+            showMessage('已删除', 'success');
+            loadLogs();
+        });
+    });
+}
+
+async function clearLogs() {
+    if (!confirm('确定清空所有审计日志？此操作不可恢复。')) return;
+    const { data, error } = await supabase.rpc('admin_clear_audit_logs');
+    if (error || data?.error) {
+        showMessage('清空失败：' + (error?.message || data?.error), 'error');
+        return;
+    }
+    showMessage('已清空所有日志', 'success');
+    loadLogs();
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

@@ -6,6 +6,8 @@ import { showMessage, setLoading, escapeHtml, formatTime } from './utils.js';
 let cachedColleges = [];
 let cachedParticipants = [];
 let cachedRules = [];
+let currentEventStatus = null;
+let cachedChain = [];
 
 // ============ Tab 切换 ============
 function initTabs() {
@@ -29,7 +31,6 @@ function loadTab(name) {
         chain: loadChain,
         eliminations: loadEliminations,
         reports: loadReports,
-        logs: loadLogs,
     };
     map[name]?.();
 }
@@ -47,6 +48,8 @@ async function loadEvent() {
         paused: '已暂停',
         ended: '已结束',
     };
+    currentEventStatus = data.status;
+
     document.getElementById('event-info').innerHTML = `
     <p>名称：${escapeHtml(data.name)}</p>
     <p>状态：${statusMap[data.status] || data.status}</p>
@@ -54,6 +57,21 @@ async function loadEvent() {
   `;
     document.getElementById('event-name').value = data.name || '';
     document.getElementById('event-day').value = data.current_day || 1;
+
+    // 更新暂停/继续按钮
+    const btn = document.getElementById('btn-toggle-pause');
+    if (btn) {
+        if (data.status === 'active') {
+            btn.textContent = '暂停';
+            btn.disabled = false;
+        } else if (data.status === 'paused') {
+            btn.textContent = '继续';
+            btn.disabled = false;
+        } else {
+            btn.textContent = '暂停';
+            btn.disabled = true; // draft / ended 时禁用
+        }
+    }
 }
 
 async function resetScores() {
@@ -103,24 +121,33 @@ async function reshuffleAlive() {
     showMessage(`已打乱 ${data.alive_count} 名存活者`, 'success');
 }
 
-async function pauseEvent() {
-    const { data, error } = await supabase.rpc('admin_pause_event');
-    if (error || data?.error) {
-        showMessage('暂停失败：' + (error?.message || data?.error), 'error');
-        return;
-    }
-    showMessage('活动已暂停', 'success');
-    loadEvent();
-}
+async function togglePause() {
+    const btn = document.getElementById('btn-toggle-pause');
+    if (!btn || btn.disabled) return;
 
-async function resumeEvent() {
-    const { data, error } = await supabase.rpc('admin_resume_event');
-    if (error || data?.error) {
-        showMessage('继续失败：' + (error?.message || data?.error), 'error');
-        return;
+    if (currentEventStatus === 'active') {
+        btn.disabled = true;
+        const { data, error } = await supabase.rpc('admin_pause_event');
+        btn.disabled = false;
+        if (error || data?.error) {
+            showMessage('暂停失败：' + (error?.message || data?.error), 'error');
+            return;
+        }
+        showMessage('活动已暂停', 'success');
+        loadEvent();
+    } else if (currentEventStatus === 'paused') {
+        btn.disabled = true;
+        const { data, error } = await supabase.rpc('admin_resume_event');
+        btn.disabled = false;
+        if (error || data?.error) {
+            showMessage('继续失败：' + (error?.message || data?.error), 'error');
+            return;
+        }
+        showMessage('活动已继续', 'success');
+        loadEvent();
+    } else {
+        showMessage('当前状态无法暂停/继续', 'error');
     }
-    showMessage('活动已继续', 'success');
-    loadEvent();
 }
 
 async function endEvent() {
@@ -223,7 +250,7 @@ function renderParticipants(list) {
 
     el.querySelectorAll('[data-delete-p]').forEach(btn => {
         btn.addEventListener('click', async () => {
-            if (!confirm('确定删除该参与者？')) return;
+            if (!confirm('确定删除该参与者？删除后会同步清理其击杀记录、举报和相关引用。')) return;
             const { data, error } = await supabase.rpc('admin_delete_participant', {
                 p_id: btn.dataset.deleteP,
             });
@@ -359,40 +386,75 @@ async function publishRule() {
 // ============ 全局链 ============
 async function loadChain() {
     const { data, error } = await supabase.rpc('admin_get_global_chain');
-    if (error || data?.error) {
-        document.getElementById('chain-list').textContent = '加载失败';
+    if (error) {
+        document.getElementById('chain-list').textContent = '加载失败：' + error.message;
         return;
     }
+    if (data?.error) {
+        document.getElementById('chain-list').textContent = '加载失败：' + data.error;
+        return;
+    }
+
+    cachedChain = Array.isArray(data) ? data : [];
+    renderChain(cachedChain);
+}
+
+async function renderChain(list) {
     const el = document.getElementById('chain-list');
-    if (!data.length) {
+    if (!list.length) {
         el.innerHTML = '<p class="hint">暂无数据</p>';
         return;
     }
-    el.innerHTML = data.map(p => `
-    <div class="admin-row">
-      <span class="admin-name">${escapeHtml(p.name)}</span>
-      <span class="admin-meta">${escapeHtml(p.code || '-')} → ${escapeHtml(p.target_name || '无')} (${escapeHtml(p.target_code || '-')})</span>
-      <span class="admin-meta">${escapeHtml(p.status)}</span>
-      ${p.status === 'alive' && p.target_name ? `
-        <button class="btn-mini btn-warn" data-admin-kill="${p.id}" data-award="1">击杀+加分</button>
-        <button class="btn-mini" data-admin-kill="${p.id}" data-award="0">击杀不加分</button>
-      ` : ''}
-    </div>
-  `).join('');
+
+    const { data: eventData } = await supabase.rpc('admin_get_event');
+    const eventActive = eventData?.status === 'active';
+
+    el.innerHTML = list.map(p => {
+        const status = p.status ?? '';
+        const targetName = p.target_name ?? '';
+        const collegeName = p.college_name ?? '';
+        const canKill = String(status).toLowerCase() === 'alive' && targetName;
+
+        return `
+        <div class="admin-row">
+            <span class="admin-name">${escapeHtml(p.name)}</span>
+            <span class="admin-meta">${escapeHtml(p.code || '-')} → ${escapeHtml(targetName || '无')} (${escapeHtml(p.target_code || '-')})</span>
+            <span class="admin-meta">${escapeHtml(status)}</span>
+            ${canKill ? `
+                <button class="btn-mini btn-warn"
+                        data-admin-kill="${p.id}"
+                        data-award="1"
+                        data-target-name="${escapeHtml(targetName)}"
+                        data-college-name="${escapeHtml(collegeName)}"
+                        ${eventActive ? '' : 'disabled'}>击杀+加分</button>
+                <button class="btn-mini"
+                        data-admin-kill="${p.id}"
+                        data-award="0"
+                        data-target-name="${escapeHtml(targetName)}"
+                        data-college-name="${escapeHtml(collegeName)}"
+                        ${eventActive ? '' : 'disabled'}>击杀不加分</button>
+            ` : ''}
+        </div>`;
+    }).join('');
 
     el.querySelectorAll('[data-admin-kill]').forEach(btn => {
         btn.addEventListener('click', async () => {
             const hunterId = btn.dataset.adminKill;
             const award = btn.dataset.award === '1';
-            const msg = award
-                ? '确认执行击杀，并给击杀者学院加 1 分？'
-                : '确认执行击杀（不加分）？';
+            const targetName = btn.dataset.targetName || '目标';
+            const collegeName = btn.dataset.collegeName || '该学院';
+
+            const awardText = award ? '将' : '将不会';
+            const msg = `是否确认击杀“${targetName}”，该击杀${awardText}给“${collegeName}”加分？`;
             if (!confirm(msg)) return;
 
+            btn.disabled = true;
             const { data: res, error: err } = await supabase.rpc('admin_kill_target', {
                 p_hunter_id: hunterId,
                 p_award_points: award,
             });
+            btn.disabled = false;
+
             if (err || res?.error) {
                 showMessage('失败：' + (err?.message || res?.error), 'error');
                 return;
@@ -405,6 +467,21 @@ async function loadChain() {
             loadChain();
         });
     });
+}
+
+function filterChain() {
+    const kw = document.getElementById('chain-search').value.trim().toLowerCase();
+    if (!kw) {
+        renderChain(cachedChain);
+        return;
+    }
+    const filtered = cachedChain.filter(p =>
+        (p.name || '').toLowerCase().includes(kw) ||
+        (p.code || '').toLowerCase().includes(kw) ||
+        (p.target_name || '').toLowerCase().includes(kw) ||
+        (p.target_code || '').toLowerCase().includes(kw)
+    );
+    renderChain(filtered);
 }
 
 // ============ 击杀记录 ============
@@ -506,8 +583,7 @@ function bindEvents() {
         ?.addEventListener('click', saveEvent);
     document.getElementById('btn-start')?.addEventListener('click', startEvent);
     document.getElementById('btn-reshuffle')?.addEventListener('click', reshuffleAlive);
-    document.getElementById('btn-pause')?.addEventListener('click', pauseEvent);
-    document.getElementById('btn-resume')?.addEventListener('click', resumeEvent);
+    document.getElementById('btn-toggle-pause')?.addEventListener('click', togglePause);
     document.getElementById('btn-end')?.addEventListener('click', endEvent);
     document.getElementById('btn-add-participant')
         ?.addEventListener('click', addParticipant);
@@ -521,39 +597,12 @@ function bindEvents() {
 
     document.getElementById('btn-refresh-chain')
         ?.addEventListener('click', loadChain);
+    document.getElementById('chain-search')
+        ?.addEventListener('input', filterChain);
     document.getElementById('btn-refresh-elims')
         ?.addEventListener('click', loadEliminations);
     document.getElementById('btn-refresh-reports')
         ?.addEventListener('click', loadReports);
-    document.getElementById('btn-refresh-logs')
-        ?.addEventListener('click', loadLogs);
-}
-
-// ============ 审计日志 ============
-async function loadLogs() {
-    const { data, error } = await supabase.rpc('admin_get_audit_logs');
-    if (error || data?.error) {
-        document.getElementById('logs-list').textContent = '加载失败';
-        return;
-    }
-    const el = document.getElementById('logs-list');
-    if (!data || !data.length) {
-        el.innerHTML = '<p class="hint">暂无日志</p>';
-        return;
-    }
-
-    const actionMap = {
-        start_event: '开始活动',
-        admin_kill: '管理员击杀',
-    };
-
-    el.innerHTML = data.map(log => `
-        <div class="admin-row">
-            <span class="admin-name">${escapeHtml(actionMap[log.action] || log.action)}</span>
-            <span class="admin-meta">${escapeHtml(log.admin_email || '系统')} · ${formatTime(log.created_at)}</span>
-            <span class="admin-meta">${escapeHtml(JSON.stringify(log.details || {}))}</span>
-        </div>
-    `).join('');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

@@ -28,7 +28,8 @@
             <button class="tab" data-tab="chain">全局链</button>
             <button class="tab" data-tab="admins">管理员</button>
             <button class="tab" data-tab="eliminations">击杀记录</button>
-            <button class="tab" data-tab="reports">举报</button>
+            <button class="tab" data-tab="reports" style="display: none;">举报</button>
+            <button class="tab" data-tab="history">历史记录</button>
         </nav>
 
         <!-- 事件 -->
@@ -71,18 +72,43 @@
         <section class="tab-panel" id="panel-participants">
             <div class="card">
                 <h2>导入参与者（CSV）</h2>
-                <p class="hint">格式：email,name,college_name,photo_url（每行一个，第一行可为表头）</p>
-                <textarea id="csv-input" rows="6" placeholder="test1@bjsmicschool.com,张三,Red,
-test2@bjsmicschool.com,李四,Blue,"></textarea>
-                <button class="btn-primary" id="btn-import-csv">导入</button>
+                <<p class="hint">
+                    列顺序：name, grade, house, photo_url, email。<br>
+                    grade 可选值：G9 / G10 / G11 / G12 / Teacher（留空也可）。
+                    </p>
+                    <textarea id="csv-input" rows="6" placeholder="张三,G10,Red,,
+李四,Teacher,Blue,,
+王五,G11,,,"></textarea>
+                    <button class="btn-primary" id="btn-import-csv">导入</button>
             </div>
 
             <div class="card">
                 <h2>添加单个参与者</h2>
-                <input type="email" id="p-email" placeholder="邮箱">
-                <input type="text" id="p-name" placeholder="姓名">
-                <select id="p-college"></select>
+                <label>姓名 *</label>
+                <input type="text" id="p-name" placeholder="姓名（必填）">
+
+                <label>年级</label>
+                <label>Grade</label>
+                <select id="p-grade">
+                    <option value="">（不指定）</option>
+                    <option value="G9">G9</option>
+                    <option value="G10">G10</option>
+                    <option value="G11">G11</option>
+                    <option value="G12">G12</option>
+                    <option value="Teacher">Teacher</option>
+                </select>
+
+                <label>House / 学院</label>
+                <select id="p-college">
+                    <option value="">（不指定）</option>
+                </select>
+
+                <label>照片 URL</label>
                 <input type="text" id="p-photo" placeholder="照片 URL（可选）">
+
+                <label>邮箱</label>
+                <input type="email" id="p-email" placeholder="学校邮箱（可选，仅用于未来登录）">
+
                 <button class="btn-primary" id="btn-add-participant">添加</button>
             </div>
 
@@ -92,6 +118,78 @@ test2@bjsmicschool.com,李四,Blue,"></textarea>
                 <div id="participants-list">加载中...</div>
             </div>
         </section>
+
+        <!-- 编辑参与者 Modal -->
+        <div id="edit-participant-modal" class="modal-overlay" style="display:none">
+            <div class="modal-box">
+                <h3>编辑参与者</h3>
+                <div id="edit-participant-message" class="message" style="display:none"></div>
+
+                <label>姓名 *</label>
+                <input type="text" id="edit-p-name">
+
+                <label>Grade</label>
+                <select id="edit-p-grade">
+                    <option value="">（不指定）</option>
+                    <option value="G9">G9</option>
+                    <option value="G10">G10</option>
+                    <option value="G11">G11</option>
+                    <option value="G12">G12</option>
+                    <option value="Teacher">Teacher</option>
+                </select>
+
+                <label>House / 学院</label>
+                <select id="edit-p-college">
+                    <option value="">（不指定）</option>
+                </select>
+
+                <label>照片 URL</label>
+                <input type="text" id="edit-p-photo">
+
+                <label>邮箱</label>
+                <input type="email" id="edit-p-email" placeholder="学校邮箱（可选）">
+
+                <div class="btn-row">
+                    <button class="btn-primary" id="btn-save-edit-participant">保存</button>
+                    <button class="btn-secondary" id="btn-cancel-edit-participant">取消</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 击杀原因 Modal -->
+        <div id="kill-reason-modal" class="modal-overlay" style="display:none">
+            <div class="modal-box">
+                <h3>选择击杀原因</h3>
+                <p class="hint">目标：<strong id="kill-target-name">-</strong></p>
+
+                <div class="kill-reason-list">
+                    <label class="kill-reason-option">
+                        <input type="radio" name="kill-reason" value="normal" checked>
+                        <span>正常击杀</span><span class="reason-score">得分</span>
+                    </label>
+                    <label class="kill-reason-option">
+                        <input type="radio" name="kill-reason" value="rule_violation">
+                        <span>违反规则</span><span class="reason-score">得分</span>
+                    </label>
+                    <label class="kill-reason-option">
+                        <input type="radio" name="kill-reason" value="task_incomplete">
+                        <span>未完成任务</span><span class="reason-score">得分</span>
+                    </label>
+                    <label class="kill-reason-option">
+                        <input type="radio" name="kill-reason" value="absent">
+                        <span>缺勤</span><span class="reason-score">得分</span>
+                    </label>
+                    <label class="kill-reason-option">
+                        <input type="radio" name="kill-reason" value="no_points">
+                        <span>不计分击杀</span><span class="reason-score reason-no">不得分</span>
+                    </label>
+                </div>
+
+                <div class="btn-row">
+                    <button class="btn-primary" id="btn-kill-reason-next">继续</button>
+                </div>
+            </div>
+        </div>
 
         <!-- 每日规则 -->
         <section class="tab-panel" id="panel-rules">
@@ -120,6 +218,27 @@ test2@bjsmicschool.com,李四,Blue,"></textarea>
         <!-- 全局链 -->
         <section class="tab-panel" id="panel-chain">
             <div class="card">
+                <h2>重新加入已淘汰者</h2>
+                <p class="hint">搜索一个已淘汰的参与者，再选择要插入的位置（Hunter → 新加入者 → 原目标）。</p>
+
+                <label>搜索已淘汰者</label>
+                <input type="text" id="reinsert-search" placeholder="输入姓名或邮箱">
+
+                <div id="reinsert-search-results" style="margin-top:8px"></div>
+
+                <div id="reinsert-selected" style="display:none;margin-top:12px">
+                    <p>已选择：<strong id="reinsert-selected-name">-</strong></p>
+
+                    <label>选择插入位置</label>
+                    <select id="reinsert-hunter-select"></select>
+
+                    <div class="btn-row">
+                        <button class="btn-primary" id="btn-confirm-reinsert">确认加入</button>
+                        <button class="btn-secondary" id="btn-cancel-reinsert">取消</button>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
                 <h2>全局链</h2>
                 <input type="text" id="chain-search" placeholder="搜索姓名、代码、目标姓名、目标代码">
                 <div class="btn-row">
@@ -127,6 +246,7 @@ test2@bjsmicschool.com,李四,Blue,"></textarea>
                 </div>
                 <div id="chain-list">加载中...</div>
             </div>
+
         </section>
 
         <!-- 管理员 -->
@@ -155,11 +275,26 @@ test2@bjsmicschool.com,李四,Blue,"></textarea>
         </section>
 
         <!-- 举报 -->
-        <section class="tab-panel" id="panel-reports">
+        <section class="tab-panel" id="panel-reports" style="display: none;">
             <div class="card">
                 <h2>举报列表</h2>
                 <button class="btn-secondary" id="btn-refresh-reports">刷新</button>
                 <div id="reports-list">加载中...</div>
+            </div>
+        </section>
+
+        <!-- 历史记录 -->
+        <section class="tab-panel" id="panel-history">
+            <div class="card">
+                <h2>历史记录</h2>
+                <p class="hint">按时间倒序显示击杀、撤销、复活等所有操作。</p>
+
+                <div class="btn-row">
+                    <button class="btn-secondary" id="btn-refresh-history">刷新</button>
+                </div>
+
+                <input type="text" id="history-search" placeholder="搜索姓名、学院、原因、操作者...">
+                <div id="history-list">加载中...</div>
             </div>
         </section>
     </main>

@@ -3,6 +3,14 @@ import { supabase } from './supabase.js';
 import { requireLogin, signOut, checkIsAdmin } from './auth.js';
 import { showMessage, setLoading, escapeHtml, formatTime } from './utils.js';
 
+const KILL_REASONS = {
+    normal: { label: '正常击杀', award: true },
+    rule_violation: { label: '违反规则', award: true },
+    task_incomplete: { label: '未完成任务', award: true },
+    absent: { label: '缺勤', award: true },
+    no_points: { label: '不计分击杀', award: false },
+};
+
 let cachedColleges = [];
 let cachedParticipants = [];
 let cachedRules = [];
@@ -30,6 +38,7 @@ function loadTab(name) {
         rules: loadRules,
         chain: loadChain,
         eliminations: loadEliminations,
+        history: loadHistory,   // 新增
         reports: loadReports,
         admins: loadAdmins,
     };
@@ -218,9 +227,8 @@ async function loadColleges() {
 
     // 填充参与者下拉
     const sel = document.getElementById('p-college');
-    sel.innerHTML = data.map(c =>
-        `<option value="${c.id}">${escapeHtml(c.name)}</option>`
-    ).join('');
+    sel.innerHTML = '<option value="">（不指定）</option>' +
+        data.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
 }
 
 // ============ 参与者 ============
@@ -243,11 +251,17 @@ function renderParticipants(list) {
     }
     el.innerHTML = list.map(p => `
     <div class="admin-row">
-      <span class="admin-name">${escapeHtml(p.name)}</span>
-      <span class="admin-meta">${escapeHtml(p.email)} · ${escapeHtml(p.college_name)} · ${escapeHtml(p.status)}</span>
-      <button class="btn-mini" data-delete-p="${p.id}">删除</button>
+        <span class="admin-name">${escapeHtml(p.name)}</span>
+        <span class="admin-meta">
+            ${p.grade ? escapeHtml(p.grade) + ' · ' : ''}
+            ${escapeHtml(p.college_name || '未分 House')}
+            · ${escapeHtml(p.status)}
+            ${p.email ? ' · ' + escapeHtml(p.email) : ''}
+        </span>
+        <button class="btn-mini" data-edit-p="${p.id}">编辑</button>
+        <button class="btn-mini btn-warn" data-delete-p="${p.id}">删除</button>
     </div>
-  `).join('');
+`).join('');
 
     el.querySelectorAll('[data-delete-p]').forEach(btn => {
         btn.addEventListener('click', async () => {
@@ -260,39 +274,145 @@ function renderParticipants(list) {
             loadParticipantsTab();
         });
     });
+
+    el.querySelectorAll('[data-edit-p]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const p = cachedParticipants.find(x => x.id === btn.dataset.editP);
+            if (p) openEditParticipant(p);
+        });
+    });
+}
+
+// ============ 编辑参与者 ============
+let editingParticipantId = null;
+
+function openEditParticipant(p) {
+    editingParticipantId = p.id;
+
+    // 填充 House 下拉
+    const collegeSel = document.getElementById('edit-p-college');
+    collegeSel.innerHTML = '<option value="">（不指定）</option>' +
+        cachedColleges.map(c =>
+            `<option value="${c.id}">${escapeHtml(c.name)}</option>`
+        ).join('');
+
+    document.getElementById('edit-p-name').value = p.name || '';
+    document.getElementById('edit-p-grade').value = p.grade || '';
+    document.getElementById('edit-p-college').value = p.college_id || '';
+    document.getElementById('edit-p-photo').value = p.photo_url || '';
+    document.getElementById('edit-p-email').value = p.email || '';
+
+    const msg = document.getElementById('edit-participant-message');
+    msg.style.display = 'none';
+
+    document.getElementById('edit-participant-modal').style.display = 'flex';
+}
+
+function closeEditParticipant() {
+    editingParticipantId = null;
+    document.getElementById('edit-participant-modal').style.display = 'none';
+}
+
+async function saveEditParticipant() {
+    if (!editingParticipantId) return;
+
+    const name = document.getElementById('edit-p-name').value.trim();
+    const grade = document.getElementById('edit-p-grade').value || null;
+    const collegeId = document.getElementById('edit-p-college').value || null;
+    const photo = document.getElementById('edit-p-photo').value.trim();
+    const email = document.getElementById('edit-p-email').value.trim();
+
+    const msg = document.getElementById('edit-participant-message');
+    msg.style.display = 'none';
+
+    if (!name) {
+        msg.textContent = '姓名不能为空';
+        msg.className = 'message message-error';
+        msg.style.display = 'block';
+        return;
+    }
+
+    const btn = document.getElementById('btn-save-edit-participant');
+    btn.disabled = true;
+
+    const { data, error } = await supabase.rpc('admin_update_participant', {
+        p_id: editingParticipantId,
+        p_name: name,
+        p_grade: grade,
+        p_college_id: collegeId,
+        p_photo_url: photo || null,
+        p_email: email || null,
+    });
+
+    btn.disabled = false;
+
+    if (error || data?.error) {
+        const errMap = {
+            not_admin: '你不是管理员',
+            id_required: '缺少参与者 ID',
+            name_required: '姓名不能为空',
+            participant_not_found: '参与者不存在',
+            email_exists: '该邮箱已被其他参与者使用',
+            invalid_school_email: '邮箱必须是学校邮箱',
+        };
+        msg.textContent = errMap[data?.error] || error?.message || data?.error || '保存失败';
+        msg.className = 'message message-error';
+        msg.style.display = 'block';
+        return;
+    }
+
+    closeEditParticipant();
+    showMessage('已保存', 'success');
+    loadParticipantsTab();
 }
 
 function filterParticipants() {
     const kw = document.getElementById('p-search').value.trim().toLowerCase();
     if (!kw) { renderParticipants(cachedParticipants); return; }
     renderParticipants(cachedParticipants.filter(p =>
-        p.name.toLowerCase().includes(kw) || p.email.toLowerCase().includes(kw)
+        (p.name || '').toLowerCase().includes(kw) ||
+        (p.email || '').toLowerCase().includes(kw) ||
+        (p.grade || '').toLowerCase().includes(kw)
     ));
 }
 
 async function addParticipant() {
-    const email = document.getElementById('p-email').value.trim();
     const name = document.getElementById('p-name').value.trim();
-    const collegeId = document.getElementById('p-college').value;
+    const grade = document.getElementById('p-grade').value.trim();
+    const collegeId = document.getElementById('p-college').value || null;
     const photo = document.getElementById('p-photo').value.trim();
+    const email = document.getElementById('p-email').value.trim();
 
-    if (!email || !name || !collegeId) {
-        showMessage('请填写邮箱、姓名、学院', 'error');
+    if (!name) {
+        showMessage('请填写姓名', 'error');
         return;
     }
 
     const { data, error } = await supabase.rpc('admin_add_participant', {
-        p_email: email, p_name: name,
+        p_name: name,
+        p_grade: grade || null,
         p_college_id: collegeId,
         p_photo_url: photo || null,
+        p_email: email || null,
     });
+
     if (error || data?.error) {
-        showMessage('添加失败：' + (error?.message || data?.error), 'error');
+        const errMap = {
+            not_admin: '你不是管理员',
+            name_required: '姓名不能为空',
+            email_exists: '该邮箱已存在',
+            invalid_school_email: '邮箱必须是学校邮箱',
+            no_event: '没有事件',
+        };
+        showMessage('添加失败：' + (errMap[data?.error] || error?.message || data?.error), 'error');
         return;
     }
-    document.getElementById('p-email').value = '';
+
+    // 清空表单（保留 house 选择）
     document.getElementById('p-name').value = '';
+    document.getElementById('p-grade').value = '';
     document.getElementById('p-photo').value = '';
+    document.getElementById('p-email').value = '';
     showMessage('已添加', 'success');
     loadParticipantsTab();
 }
@@ -304,23 +424,28 @@ async function importCSV() {
     const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
     if (!lines.length) { showMessage('CSV 为空', 'error'); return; }
 
-    // 跳过表头
-    if (lines[0].toLowerCase().startsWith('email')) lines.shift();
-
-    const collegeMap = {};
-    cachedColleges.forEach(c => { collegeMap[c.name.toLowerCase()] = c.id; });
-
+    // 跳过表头（如果第一行以 name 开头）
+    if (lines[0].toLowerCase().startsWith('name')) lines.shift();
+    const VALID_GRADES = ['G9', 'G10', 'G11', 'G12', 'Teacher'];
     const rows = [];
     for (const line of lines) {
         const parts = line.split(',').map(s => s.trim());
-        const [email, name, collegeName, photoUrl] = parts;
-        if (!email || !name || !collegeName) continue;
-        const collegeId = collegeMap[collegeName.toLowerCase()];
-        if (!collegeId) {
-            showMessage(`未找到学院：${collegeName}`, 'error');
-            return;
+        const [name, grade, collegeName, photoUrl, email] = parts;
+
+        if (!name) continue; // 姓名为空的行直接跳过
+
+        let gradeVal = grade || null;
+        if (gradeVal && !VALID_GRADES.includes(gradeVal)) {
+            gradeVal = null; // 或改成 throw 提示，二选一
         }
-        rows.push({ email, name, college_id: collegeId, photo_url: photoUrl || null });
+
+        rows.push({
+            name: name,
+            grade: gradeVal,
+            college_name: collegeName || null,
+            photo_url: photoUrl || null,
+            email: email || null,
+        });
     }
 
     if (!rows.length) { showMessage('没有有效行', 'error'); return; }
@@ -330,7 +455,9 @@ async function importCSV() {
         showMessage('导入失败：' + (error?.message || data?.error), 'error');
         return;
     }
-    showMessage(`已导入 ${data.count} 人`, 'success');
+
+    const skipped = data.skipped ? `（跳过 ${data.skipped} 行）` : '';
+    showMessage(`已导入 ${data.count} 人${skipped}`, 'success');
     document.getElementById('csv-input').value = '';
     loadParticipantsTab();
 }
@@ -400,6 +527,158 @@ async function loadChain() {
     renderChain(cachedChain);
 }
 
+let reinsertSelected = null;
+let reinsertSearchTimer = null;
+
+async function searchEliminated(query) {
+    const { data, error } = await supabase.rpc('admin_search_eliminated_participants', {
+        p_query: query || '',
+    });
+    if (error) {
+        document.getElementById('reinsert-search-results').textContent =
+            '搜索失败：' + error.message;
+        return;
+    }
+    renderReinsertResults(Array.isArray(data) ? data : []);
+}
+
+function renderReinsertResults(list) {
+    const el = document.getElementById('reinsert-search-results');
+    if (!list.length) {
+        el.innerHTML = '<p class="hint">没有匹配的已淘汰者</p>';
+        return;
+    }
+    el.innerHTML = list.map(p => `
+        <div class="admin-row">
+            <span class="admin-name">${escapeHtml(p.name)}</span>
+            <span class="admin-meta">${escapeHtml(p.email || '')} · ${escapeHtml(p.college_name || '')}</span>
+            <button class="btn-mini"
+                    data-pick-reinsert="${p.id}"
+                    data-name="${escapeHtml(p.name)}">选择</button>
+        </div>
+    `).join('');
+
+    el.querySelectorAll('[data-pick-reinsert]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            selectEliminatedForReinsert(btn.dataset.pickReinsert, btn.dataset.name);
+        });
+    });
+}
+
+async function selectEliminatedForReinsert(id, name) {
+    reinsertSelected = { id, name };
+    document.getElementById('reinsert-selected-name').textContent = name;
+    document.getElementById('reinsert-selected').style.display = 'block';
+    await fillReinsertHunterSelect();
+}
+
+async function fillReinsertHunterSelect() {
+    const { data, error } = await supabase.rpc('admin_get_global_chain');
+    const sel = document.getElementById('reinsert-hunter-select');
+
+    if (error || data?.error) {
+        sel.innerHTML = '<option value="">（加载失败）</option>';
+        return;
+    }
+
+    const aliveWithTarget = (data || []).filter(p =>
+        String(p.status).toLowerCase() === 'alive' && p.target_name
+    );
+
+    if (!aliveWithTarget.length) {
+        sel.innerHTML = '<option value="">（没有可插入的位置）</option>';
+        return;
+    }
+
+    sel.innerHTML = aliveWithTarget.map(p =>
+        `<option value="${p.id}">${escapeHtml(p.name)} → ${escapeHtml(p.target_name)}</option>`
+    ).join('');
+}
+
+async function confirmReinsert() {
+    if (!reinsertSelected) return;
+
+    const sel = document.getElementById('reinsert-hunter-select');
+    const hunterId = sel.value;
+    if (!hunterId) {
+        showMessage('请选择插入位置', 'error');
+        return;
+    }
+
+    const hunterLabel = sel.selectedOptions[0]?.textContent || '';
+    if (!confirm(`确认将「${reinsertSelected.name}」插入到「${hunterLabel}」之间？`)) return;
+
+    const btn = document.getElementById('btn-confirm-reinsert');
+    btn.disabled = true;
+    const { data, error } = await supabase.rpc('admin_reinsert_participant', {
+        p_participant_id: reinsertSelected.id,
+        p_hunter_id: hunterId,
+    });
+    btn.disabled = false;
+
+    if (error || data?.error) {
+        const errMap = {
+            not_admin: '你不是管理员',
+            event_not_active: '活动未进行中',
+            participant_not_found: '找不到该参与者',
+            participant_not_eliminated: '该参与者不是已淘汰状态',
+            hunter_not_found: '找不到该 Hunter',
+            hunter_not_alive: 'Hunter 不是存活状态',
+            hunter_no_target: 'Hunter 没有目标',
+            wrong_event: '参与者不属于当前事件',
+        };
+        showMessage(
+            '失败：' + (errMap[data?.error] || error?.message || data?.error),
+            'error'
+        );
+        return;
+    }
+
+    showMessage(
+        `已将「${data.participant_name}」加入环中，新代码：${data.code}`,
+        'success'
+    );
+    resetReinsertUI();
+    loadChain();
+}
+
+function resetReinsertUI() {
+    reinsertSelected = null;
+    const selEl = document.getElementById('reinsert-selected');
+    if (selEl) selEl.style.display = 'none';
+    const searchEl = document.getElementById('reinsert-search');
+    if (searchEl) searchEl.value = '';
+    const resEl = document.getElementById('reinsert-search-results');
+    if (resEl) resEl.innerHTML = '';
+}
+
+function bindReinsertEvents() {
+    const input = document.getElementById('reinsert-search');
+    if (input && !input.dataset.bound) {
+        input.dataset.bound = '1';
+        input.addEventListener('input', () => {
+            clearTimeout(reinsertSearchTimer);
+            reinsertSearchTimer = setTimeout(() => {
+                searchEliminated(input.value.trim());
+            }, 300);
+        });
+        // 首次打开时，先展示所有已淘汰者
+        searchEliminated('');
+    }
+
+    const btnConfirm = document.getElementById('btn-confirm-reinsert');
+    if (btnConfirm && !btnConfirm.dataset.bound) {
+        btnConfirm.dataset.bound = '1';
+        btnConfirm.addEventListener('click', confirmReinsert);
+    }
+
+    const btnCancel = document.getElementById('btn-cancel-reinsert');
+    if (btnCancel && !btnCancel.dataset.bound) {
+        btnCancel.dataset.bound = '1';
+        btnCancel.addEventListener('click', resetReinsertUI);
+    }
+}
+
 async function renderChain(list) {
     const el = document.getElementById('chain-list');
     if (!list.length) {
@@ -417,57 +696,89 @@ async function renderChain(list) {
         const canKill = String(status).toLowerCase() === 'alive' && targetName;
 
         return `
-        <div class="admin-row">
-            <span class="admin-name">${escapeHtml(p.name)}</span>
-            <span class="admin-meta">${escapeHtml(p.code || '-')} → ${escapeHtml(targetName || '无')} (${escapeHtml(p.target_code || '-')})</span>
-            <span class="admin-meta">${escapeHtml(status)}</span>
-            ${canKill ? `
-                <button class="btn-mini btn-warn"
-                        data-admin-kill="${p.id}"
-                        data-award="1"
-                        data-target-name="${escapeHtml(targetName)}"
-                        data-college-name="${escapeHtml(collegeName)}"
-                        ${eventActive ? '' : 'disabled'}>击杀+加分</button>
-                <button class="btn-mini"
-                        data-admin-kill="${p.id}"
-                        data-award="0"
-                        data-target-name="${escapeHtml(targetName)}"
-                        data-college-name="${escapeHtml(collegeName)}"
-                        ${eventActive ? '' : 'disabled'}>击杀不加分</button>
-            ` : ''}
-        </div>`;
+    <div class="admin-row">
+        <span class="admin-name">${escapeHtml(p.name)}</span>
+        <span class="admin-meta">${escapeHtml(p.code || '-')} → ${escapeHtml(targetName || '无')} (${escapeHtml(p.target_code || '-')})</span>
+        <span class="admin-meta">${escapeHtml(status)}</span>
+        ${canKill ? `
+            <button class="btn-mini btn-warn"
+                    data-kill-btn="${p.id}"
+                    data-target-name="${escapeHtml(targetName)}"
+                    data-college-name="${escapeHtml(collegeName)}"
+                    ${eventActive ? '' : 'disabled'}>完成击杀</button>
+        ` : ''}
+    </div>`;
     }).join('');
 
-    el.querySelectorAll('[data-admin-kill]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const hunterId = btn.dataset.adminKill;
-            const award = btn.dataset.award === '1';
-            const targetName = btn.dataset.targetName || '目标';
-            const collegeName = btn.dataset.collegeName || '该学院';
-
-            const awardText = award ? '将' : '将不会';
-            const msg = `是否确认击杀“${targetName}”，该击杀${awardText}给“${collegeName}”加分？`;
-            if (!confirm(msg)) return;
-
-            btn.disabled = true;
-            const { data: res, error: err } = await supabase.rpc('admin_kill_target', {
-                p_hunter_id: hunterId,
-                p_award_points: award,
+    el.querySelectorAll('[data-kill-btn]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            openKillReasonModal({
+                hunterId: btn.dataset.killBtn,
+                targetName: btn.dataset.targetName,
+                collegeName: btn.dataset.collegeName,
             });
-            btn.disabled = false;
-
-            if (err || res?.error) {
-                showMessage('失败：' + (err?.message || res?.error), 'error');
-                return;
-            }
-            if (res?.winner) {
-                showMessage(`击杀成功！${res.winner_name || ''} 获胜，活动已结束。`, 'success');
-            } else {
-                showMessage('击杀成功', 'success');
-            }
-            loadChain();
         });
     });
+}
+
+// ============ 击杀原因 Modal ============
+let pendingKill = null;
+
+function openKillReasonModal(ctx) {
+    pendingKill = ctx;
+    document.getElementById('kill-target-name').textContent = ctx.targetName || '-';
+
+    // 默认选中 normal
+    const radios = document.querySelectorAll('input[name="kill-reason"]');
+    radios.forEach(r => { r.checked = (r.value === 'normal'); });
+
+    document.getElementById('kill-reason-modal').style.display = 'flex';
+}
+
+function closeKillReasonModal() {
+    pendingKill = null;
+    document.getElementById('kill-reason-modal').style.display = 'none';
+}
+
+async function submitKillWithReason() {
+    if (!pendingKill) return;
+
+    const selected = document.querySelector('input[name="kill-reason"]:checked');
+    const reason = selected ? selected.value : 'normal';
+    const info = KILL_REASONS[reason] || KILL_REASONS.normal;
+
+    const { hunterId, targetName, collegeName } = pendingKill;
+
+    // 二次确认
+    const awardText = info.award ? '将' : '将不';
+    const msg = `确定“${targetName}”因为“${info.label}”而被击杀，“${collegeName || '该学院'}”${awardText}得分。`;
+    if (!confirm(msg)) return;
+
+    closeKillReasonModal();
+
+    const { data: res, error: err } = await supabase.rpc('admin_kill_target', {
+        p_hunter_id: hunterId,
+        p_reason: reason,
+    });
+
+    if (err || res?.error) {
+        const errMap = {
+            not_admin: '你不是管理员',
+            event_not_active: '活动未进行中',
+            hunter_not_alive: '猎人不是存活状态',
+            hunter_no_target: '猎人没有目标',
+            target_already_eliminated: '目标已被淘汰',
+        };
+        showMessage('失败：' + (errMap[res?.error] || err?.message || res?.error), 'error');
+        return;
+    }
+
+    if (res?.winner) {
+        showMessage(`击杀成功！${res.winner_name || ''} 获胜，活动已结束。`, 'success');
+    } else {
+        showMessage('击杀成功', 'success');
+    }
+    loadChain();
 }
 
 function filterChain() {
@@ -650,6 +961,106 @@ async function loadReports() {
     });
 }
 
+// ============ 历史记录 ============
+let cachedHistory = [];
+
+async function loadHistory() {
+    const { data, error } = await supabase.rpc('admin_get_history', { p_limit: 500 });
+    if (error || data?.error) {
+        document.getElementById('history-list').textContent = '加载失败';
+        return;
+    }
+    cachedHistory = Array.isArray(data) ? data : [];
+    renderHistory(cachedHistory);
+}
+
+function renderHistory(list) {
+    const el = document.getElementById('history-list');
+    if (!list.length) {
+        el.innerHTML = '<p class="hint">暂无历史记录</p>';
+        return;
+    }
+
+    el.innerHTML = list.map(h => {
+        const t = formatTime(h.happened_at);
+        const d = h.details || {};
+
+        if (h.type === 'kill') {
+            const reasonInfo = KILL_REASONS[d.reason] || null;
+            const reasonLabel = reasonInfo ? reasonInfo.label : (d.reason || '');
+            const pts = d.points_awarded
+                ? `，<strong>${escapeHtml(d.hunter_college || '?')} +${d.points_awarded}</strong>`
+                : '，不加分';
+            return `
+        <div class="history-item">
+            <div class="history-time">${t}</div>
+            <div class="history-content">
+                <strong>${escapeHtml(d.hunter_name || '?')}</strong>
+                击杀了
+                <strong>${escapeHtml(d.target_name || '?')}</strong>${pts}
+                ${reasonLabel ? `<div class="history-note">原因：${escapeHtml(reasonLabel)}</div>` : ''}
+            </div>
+        </div>`;
+        }
+
+        if (h.type === 'revoke') {
+            const pts = d.points_awarded
+                ? `，<strong>${escapeHtml(d.hunter_college || '?')} -${d.points_awarded}</strong>`
+                : '';
+            return `
+                <div class="history-item">
+                    <div class="history-time">${t}</div>
+                    <div class="history-content">
+                        <span class="history-tag tag-revoke">撤销</span>
+                        撤销了 <strong>${escapeHtml(d.hunter_name || '?')}</strong>
+                        击杀 <strong>${escapeHtml(d.target_name || '?')}</strong>${pts}
+                        ${(() => { const r = KILL_REASONS[d.reason]; return r ? `<div class="history-note">原击杀原因：${escapeHtml(r.label)}</div>` : ''; })()}
+                        ${d.revoke_reason ? `<div class="history-note">原因：${escapeHtml(d.revoke_reason)}</div>` : ''}
+                        ${d.revoked_by_email ? `<div class="history-note">操作者：${escapeHtml(d.revoked_by_email)}</div>` : ''}
+                    </div>
+                </div>`;
+        }
+
+        if (h.type === 'reinsert') {
+            return `
+                <div class="history-item">
+                    <div class="history-time">${t}</div>
+                    <div class="history-content">
+                        <span class="history-tag tag-reinsert">复活</span>
+                        将 <strong>${escapeHtml(d.participant_name || '?')}</strong>
+                        重新加入环中（插入到 <strong>${escapeHtml(d.hunter_name || '?')}</strong> 之后）
+                        ${d.admin_email ? `<div class="history-note">操作者：${escapeHtml(d.admin_email)}</div>` : ''}
+                    </div>
+                </div>`;
+        }
+
+        return '';
+    }).join('');
+}
+
+function filterHistory() {
+    const kw = document.getElementById('history-search').value.trim().toLowerCase();
+    if (!kw) {
+        renderHistory(cachedHistory);
+        return;
+    }
+    const filtered = cachedHistory.filter(h => {
+        const s = [
+            h.type,
+            h.details?.hunter_name,
+            h.details?.target_name,
+            h.details?.participant_name,
+            h.details?.hunter_college,
+            h.details?.target_college,
+            h.details?.revoke_reason,
+            h.details?.revoked_by_email,
+            h.details?.admin_email,
+        ].filter(Boolean).join(' ').toLowerCase();
+        return s.includes(kw);
+    });
+    renderHistory(filtered);
+}
+
 // ============ 绑定事件 ============
 function bindEvents() {
     document.getElementById('nav-logout')?.addEventListener('click', (e) => {
@@ -685,6 +1096,25 @@ function bindEvents() {
         ?.addEventListener('click', addAdmin);
     document.getElementById('btn-refresh-admins')
         ?.addEventListener('click', loadAdmins);
+    document.getElementById('btn-save-edit-participant')
+        ?.addEventListener('click', saveEditParticipant);
+    document.getElementById('btn-cancel-edit-participant')
+        ?.addEventListener('click', closeEditParticipant);
+    document.getElementById('edit-participant-modal')
+        ?.addEventListener('click', (e) => {
+            if (e.target.id === 'edit-participant-modal') closeEditParticipant();
+        });
+    document.getElementById('btn-refresh-history')
+        ?.addEventListener('click', loadHistory);
+    document.getElementById('history-search')
+        ?.addEventListener('input', filterHistory);
+    document.getElementById('btn-kill-reason-next')
+        ?.addEventListener('click', submitKillWithReason);
+
+    document.getElementById('kill-reason-modal')
+        ?.addEventListener('click', (e) => {
+            if (e.target.id === 'kill-reason-modal') closeKillReasonModal();
+        });
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -700,5 +1130,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     initTabs();
     bindEvents();
+    bindReinsertEvents();
     await loadEvent();
 });

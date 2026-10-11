@@ -26,6 +26,7 @@
             <button class="tab" data-tab="participants">参与者</button>
             <button class="tab" data-tab="rules">每日规则</button>
             <button class="tab" data-tab="chain">全局链</button>
+            <button class="tab" data-tab="admins">管理员</button>
             <button class="tab" data-tab="eliminations">击杀记录</button>
             <button class="tab" data-tab="reports">举报</button>
         </nav>
@@ -125,6 +126,22 @@ test2@bjsmicschool.com,李四,Blue,"></textarea>
                     <button class="btn-secondary" id="btn-refresh-chain">刷新</button>
                 </div>
                 <div id="chain-list">加载中...</div>
+            </div>
+        </section>
+
+        <!-- 管理员 -->
+        <section class="tab-panel" id="panel-admins">
+            <div class="card">
+                <h2>添加管理员</h2>
+                <input type="email" id="admin-email" placeholder="管理员邮箱">
+                <input type="text" id="admin-name" placeholder="姓名（可选）">
+                <button class="btn-primary" id="btn-add-admin">添加</button>
+            </div>
+
+            <div class="card">
+                <h2>管理员列表</h2>
+                <button class="btn-secondary" id="btn-refresh-admins">刷新</button>
+                <div id="admins-list">加载中...</div>
             </div>
         </section>
 

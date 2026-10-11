@@ -1,4 +1,6 @@
 // js/confirm.js
+window.location.href = 'index.html';
+
 import { supabase } from './supabase.js';
 import { requireLogin, signOut } from './auth.js';
 import { showMessage, setLoading, escapeHtml } from './utils.js';

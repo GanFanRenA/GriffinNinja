@@ -47,10 +47,10 @@ export async function routeAfterLogin() {
     window.location.href = 'admin.html';
     return;
   }
-  const confirmed = await checkConfirmed();
-  if (!confirmed) {
-    window.location.href = 'confirm.html';
-    return;
-  }
-  window.location.href = 'me.html';
+
+  // 非管理员：拒绝登录
+  const { supabase } = await import('./supabase.js');
+  await supabase.auth.signOut();
+  alert('仅管理员可以登录。');
+  window.location.href = 'index.html';
 }

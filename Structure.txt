@@ -1,95 +1,31 @@
 ================================================================
-NinjaTag 项目文档（完整版）
-生成日期：2026-10-10
+NinjaTag 项目文档（最终版）
+生成日期：2026-10-11
 项目路径：C:\Users\samzh\Desktop\GriffinNinja
 ================================================================
 
 ================================================================
-一、游戏规则
+一、实现目的
 ================================================================
 
-1. 基本玩法
-   - 校内线下追逐淘汰活动，为期 5 天。
-   - 每人有一个“当前目标”，所有参与者构成一个全局单向环。
-   - 淘汰目标后，猎人继承目标的目标，直到只剩 1 人。
-   - 参与者按学院分为四个阵营：Red、Yellow、Blue、Green。
-   - 每次有效击杀，击杀者阵营 +1 分（管理员可选择是否加分）。
-   - 玩家击杀时需要输入目标本人的 6 位代码。
-   - 管理员可在全局链中直接执行击杀，并选择是否给对应学院加分。
-
-2. 事件生命周期
-   draft（未开始）→ active（进行中）↔ paused（暂停）→ ended（已结束）
-   - 开始活动：重置所有人状态为 alive，生成代码，随机生成环，学院分归零，状态改为 active。
-   - 暂停：状态改为 paused，击杀被拒绝。
-   - 继续：状态改为 active。
-   - 结束：状态改为 ended，标记赢家。
-   - 重新打乱：只对存活者重新生成环。
-   - 重启游戏（再次点击“开始活动”）：删除所有击杀记录，清空每个人的“已击杀列表”，重置参与者状态，重新生成代码和环。
-
-3. 击杀流程（玩家）
-   1. 猎人点击击杀当前目标。
-   2. 输入目标本人的代码。
-   3. 服务端事务：
-      - 校验事件为 active。
-      - 锁定猎人和目标。
-      - 校验猎人存活。
-      - 校验目标存活且是猎人当前目标。
-      - 校验输入代码等于目标本人的代码。
-      - 标记目标淘汰。
-      - 猎人继承目标的目标。
-      - 猎人学院 +1 分。
-      - 写击杀记录。
-      - 胜利判定。
-   4. 返回结果。
-
-4. 击杀流程（管理员）
-   - 管理员在“全局链”页面，对存活者点击“击杀+加分”或“击杀不加分”。
-   - 服务端事务与玩家击杀类似，但不校验目标代码。
-   - 击杀记录中 input_code = 'ADMIN'，points_awarded 为 1 或 0。
-   - 写入审计日志。
-
-5. 胜利判定
-   - 只剩 1 人存活 → 该人获胜，事件结束。
-   - 或猎人新目标是自己 → 猎人获胜，事件结束。
-   - 获胜者 current_target_id 置为 null，status = 'winner'。
-   - 事件 status = 'ended'，end_at = now()。
-
-6. 撤销击杀
-   - 只允许撤销最近一次有效击杀。
-   - 恢复被淘汰者。
-   - 恢复猎人目标。
-   - 扣学院分（按 points_awarded 扣）。
-   - 标记 status = 'revoked'。
-
-7. 举报流程
-   - 玩家提交 → 进 reports 表。
-   - 管理员查看（可见举报人）。
-   - 处理：resolved / rejected。
-   - 不可删除。
-
-8. 身份确认
-   - 首次登录需确认身份。
-   - 显示姓名、照片、学院。
-   - “这是我” → confirm_identity() → 进入个人页。
-   - “这不是我” → report_identity_issue() → 退出登录。
-
-9. 每日规则
-   - 管理员发布每日规则（Day 1-5）。
-   - 公共主页显示今日规则。
-
-10. 审计日志
-    - 记录管理员关键操作：开始活动、管理员击杀等。
-    - 管理员可查看、删除单条日志、清空所有日志。
+NinjaTag 是一个校内线下追逐淘汰活动系统，为期 5 天。
+参与者按学院分为四个阵营：Red、Yellow、Blue、Green。
+每人有一个“当前目标”，所有存活者构成一个全局单向环。
+淘汰目标后，猎人继承目标的目标，直到只剩 1 人。
+玩家击杀时需要输入目标本人的 6 位代码。
+管理员可在全局链中直接执行击杀，并选择是否给对应学院加分。
+系统提供公共主页、个人页、身份确认、管理后台，支持移动端访问。
 
 ================================================================
-二、已完成功能
+二、已完成内容
 ================================================================
 
 1. 数据库
-   - 表：colleges、events、participants、eliminations、reports、daily_rules、admins、audit_logs
+   - 表：colleges、events、participants、eliminations、reports、daily_rules、admins
    - 索引已建，RLS 已开启。
-   - 辅助函数：is_admin()、current_user_email()、current_participant_id()、current_event_id()、is_school_email()。
+   - 辅助函数：is_admin()、current_user_email()、current_participant_id()、current_event_id()、is_school_email()
    - 初始数据：4 个学院（Red、Yellow、Blue、Green）、1 个管理员、1 个事件。
+   - 已移除审计日志表 audit_logs 及其相关函数和策略。
 
 2. RPC 函数
    公共/玩家侧：
@@ -97,20 +33,20 @@ NinjaTag 项目文档（完整版）
    - get_my_profile()：个人页数据
    - confirm_identity()：身份确认
    - report_identity_issue(text)：上报身份异常
-   - kill_target(uuid, text)：玩家击杀事务
+   - kill_target(uuid, text)：玩家击杀事务（已修复最后两人自指问题）
    - submit_report(uuid, text, text, text)：提交举报
 
    管理员侧：
    - admin_add_participant
    - admin_update_participant
-   - admin_delete_participant
+   - admin_delete_participant（已增强：清理引用、击杀记录、举报后再删除）
    - admin_import_participants
    - admin_get_colleges
    - admin_update_college
    - admin_get_event
    - admin_update_event
    - admin_get_daily_rules
-   - admin_start_event：开始活动（重置+生成代码+生成环+清空击杀记录+写审计日志）
+   - admin_start_event（已移除审计日志，保留清空击杀记录、重置、生成代码和环）
    - admin_reshuffle_alive：只对存活者重新生成环
    - admin_pause_event：暂停
    - admin_resume_event：继续
@@ -123,18 +59,21 @@ NinjaTag 项目文档（完整版）
    - admin_handle_report
    - admin_get_participants
    - admin_get_eliminations
-   - admin_get_global_chain
-   - admin_kill_target(uuid, boolean)：管理员在全局链中击杀，可选择是否加分
-   - admin_get_audit_logs()：获取审计日志
-   - admin_delete_audit_log(uuid)：删除单条日志
-   - admin_clear_audit_logs()：清空所有日志
+   - admin_get_global_chain（已增强：按链顺序排序，赢家置顶，淘汰者按死亡时间倒序）
+   - admin_kill_target(uuid, boolean)：管理员在全局链中击杀，可选择是否加分（已修复最后两人自指问题，已移除审计日志）
+   - admin_generate_test_participants：生成 100 个测试角色（每学院 25 个）
+   - admin_delete_test_participants：删除所有测试角色
 
 3. 前端页面
    - index.html：公共主页（事件状态、阵营分、存活墙、人数、今日规则、赢家）
    - login.html：登录页（Magic Link + 测试密码登录）
    - confirm.html：首次身份确认
    - me.html：个人页（我的代码、当前目标、击杀、举报、我已淘汰的人、我的状态）
-   - admin.html：管理后台（事件、学院、参与者、每日规则、全局链、击杀记录、举报、审计日志）
+   - admin.html：管理后台（事件、学院、参与者、每日规则、全局链、击杀记录、举报）
+     - 已移除“审计日志”标签和面板。
+     - 事件页暂停/继续合并为单个按钮，根据状态自动切换。
+     - 参与者页增加“测试数据”卡片（生成/删除测试角色按钮）。
+     - 全局链增加搜索输入框。
 
 4. 前端 JS
    - js/supabase.js：Supabase 客户端
@@ -144,7 +83,8 @@ NinjaTag 项目文档（完整版）
    - js/login.js：登录逻辑
    - js/confirm.js：身份确认
    - js/me.js：个人页逻辑
-   - js/admin.js：管理后台逻辑（含审计日志、管理员击杀）
+   - js/admin.js：管理后台逻辑（含全局链排序渲染、搜索过滤、暂停/继续合并、测试角色按钮、删除参与者增强）
+     - 已移除审计日志相关函数和绑定。
 
 5. 样式
    - css/style.css：移动端优先，深色主题
@@ -160,7 +100,7 @@ NinjaTag 项目文档（完整版）
 
 8. 核心业务逻辑
    - 击杀验证：输入目标本人的代码
-   - 击杀继承：猎人继承目标的目标
+   - 击杀继承：猎人继承目标的目标（最后两人时置空，避免自指）
    - 阵营 +1 分（管理员击杀可选择加分）
    - 胜利判定：只剩 1 人存活，或猎人新目标是自己
    - 最后两人场景：自动兼容
@@ -168,7 +108,10 @@ NinjaTag 项目文档（完整版）
    - 撤销击杀：恢复环、扣分
    - 举报不删除，所有管理员可见
    - 重启游戏清空击杀记录和“已击杀列表”
-   - 审计日志记录关键操作，可查看、删除、清空
+   - 全局链排序：赢家置顶，存活者按链顺序，淘汰者按死亡时间倒序（死得晚靠前，死得早靠后）
+   - 全局链支持按姓名、代码、目标姓名、目标代码搜索
+   - 测试角色：可一键生成 100 个（每学院 25 个），可一键删除
+   - 删除参与者：自动清理其击杀记录、举报、以及指向他的引用，保持环连续
 
 9. 未完成功能（简要）
    - 照片上传接入 Storage
@@ -178,7 +121,6 @@ NinjaTag 项目文档（完整版）
    - PWA
    - 数据导出 CSV
    - 限流与安全加固
-   - 部署到生产环境（已部署 Cloudflare Pages，域名已绑定）
    - 自动备份
 
 ================================================================
@@ -278,25 +220,12 @@ NinjaTag 项目文档（完整版）
    - created_at timestamptz
    - updated_at timestamptz
 
-8. audit_logs（审计日志表）
-   字段：
-   - id uuid 主键
-   - event_id uuid → events.id ON DELETE SET NULL
-   - admin_id uuid → admins.id ON DELETE SET NULL
-   - admin_email text
-   - action text NOT NULL
-   - details jsonb DEFAULT '{}'::jsonb
-   - created_at timestamptz DEFAULT now()
-   索引：event_id、created_at DESC
-   RLS：仅管理员可读、可删除
-
 表关系：
 - colleges 1:N participants
 - events 1:N participants
 - events 1:N eliminations
 - events 1:N reports
 - events 1:N daily_rules
-- events 1:N audit_logs
 - participants 自关联：current_target_id、eliminated_by_id
 - eliminations N:1 participants（hunter）
 - eliminations N:1 participants（target）
@@ -305,14 +234,65 @@ NinjaTag 项目文档（完整版）
 - reports N:1 participants（reporter、target）
 - reports N:1 admins（handled_by）
 - daily_rules N:1 admins（created_by）
-- audit_logs N:1 admins（admin_id）
 
 视图：
 - public_home_view：公共主页数据
 - public_alive_wall_view：存活墙
 
 ================================================================
-四、职责划分
+四、完成的 SQL Function 列表
+================================================================
+
+公共/玩家侧：
+- get_public_home()
+- get_my_profile()
+- confirm_identity()
+- report_identity_issue(p_note text)
+- kill_target(p_target_id uuid, p_input_code text)
+- submit_report(p_target_id uuid, p_reason text, p_description text, p_evidence_url text)
+
+管理员侧：
+- admin_add_participant(p_email text, p_name text, p_college_id uuid, p_photo_url text)
+- admin_update_participant(...)
+- admin_delete_participant(p_id uuid)
+- admin_import_participants(p_rows jsonb)
+- admin_get_colleges()
+- admin_update_college(p_id uuid, p_name text, p_color text)
+- admin_get_event()
+- admin_update_event(p_name text, p_current_day integer)
+- admin_get_daily_rules()
+- admin_start_event()
+- admin_reshuffle_alive()
+- admin_pause_event()
+- admin_resume_event()
+- admin_end_event(p_confirm text)
+- admin_revoke_kill(p_elimination_id uuid, p_reason text)
+- admin_adjust_college_score(p_college_id uuid, p_delta integer)
+- admin_reset_college_scores()
+- admin_publish_daily_rule(p_day integer, p_title text, p_content text)
+- admin_get_reports()
+- admin_handle_report(p_report_id uuid, p_status text, p_note text)
+- admin_get_participants()
+- admin_get_eliminations()
+- admin_get_global_chain()
+- admin_kill_target(p_hunter_id uuid, p_award_points boolean)
+- admin_generate_test_participants()
+- admin_delete_test_participants()
+
+辅助函数：
+- is_admin()
+- current_user_email()
+- current_participant_id()
+- current_event_id()
+- is_school_email()
+
+已移除的函数：
+- admin_get_audit_logs()
+- admin_delete_audit_log(uuid)
+- admin_clear_audit_logs()
+
+================================================================
+五、Role 的划分
 ================================================================
 
 1. 未登录访客
@@ -331,7 +311,9 @@ NinjaTag 项目文档（完整版）
 3. 管理员
    - 可访问：全部页面
    - 可修改：所有数据
-   - 可操作：导入、编辑、删除参与者、上传照片、设置学院、生成代码和环、开始/暂停/结束活动、发布规则、处理举报、撤销击杀、加减分、重置分、导出数据、全局链中击杀、查看/删除/清空审计日志
+   - 可操作：导入、编辑、删除参与者、上传照片、设置学院、生成代码和环、
+     开始/暂停/继续/结束活动、发布规则、处理举报、撤销击杀、加减分、
+     重置分、导出数据、全局链中击杀、生成/删除测试角色、查看全局链（含排序和搜索）
 
 4. 系统
    - 发送登录邮件
@@ -339,7 +321,8 @@ NinjaTag 项目文档（完整版）
    - 生成随机环
    - 校验击杀代码
    - 事务更新环、状态、分数
-   - 写审计日志
+   - 胜利判定
+   - 全局链排序与搜索
 
 5. RLS 策略
    - colleges：匿名可读，管理员可写
@@ -349,373 +332,10 @@ NinjaTag 项目文档（完整版）
    - admins：仅管理员可读
    - eliminations：玩家只能读自己作为猎人的记录，管理员全读全写
    - reports：玩家可 insert，管理员可读可更新，不可删除
-   - audit_logs：仅管理员可读、可删除
 
 6. Storage 策略
    - photos：匿名可读，管理员可写
    - evidence：玩家可上传，仅管理员可读
-
-================================================================
-五、部分重要的 SQL 代码
-================================================================
-
-1. 创建审计日志表
-----------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS audit_logs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_id uuid REFERENCES events(id) ON DELETE SET NULL,
-  admin_id uuid REFERENCES admins(id) ON DELETE SET NULL,
-  admin_email text,
-  action text NOT NULL,
-  details jsonb DEFAULT '{}'::jsonb,
-  created_at timestamptz DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_audit_logs_event_id ON audit_logs(event_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
-
-ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Admins can read audit logs" ON audit_logs;
-CREATE POLICY "Admins can read audit logs" ON audit_logs
-  FOR SELECT USING (is_admin());
-
-DROP POLICY IF EXISTS "Admins can delete audit logs" ON audit_logs;
-CREATE POLICY "Admins can delete audit logs" ON audit_logs
-  FOR DELETE USING (is_admin());
-
-2. admin_start_event（开始活动，含清空击杀记录、审计日志）
-----------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.admin_start_event()
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $function$
-DECLARE
-  v_event_id uuid;
-  v_count integer;
-  v_ids uuid[];
-  v_codes text[] := ARRAY[]::text[];
-  v_code text;
-  v_i integer;
-  v_j integer;
-  v_tmp uuid;
-  v_alphabet text := 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-  v_code_len integer := 6;
-  v_elim_count integer;
-  v_attempts integer;
-BEGIN
-  IF NOT is_admin() THEN
-    RETURN jsonb_build_object('error', 'not_admin');
-  END IF;
-
-  SELECT id INTO v_event_id
-  FROM events
-  ORDER BY created_at DESC
-  LIMIT 1;
-
-  IF v_event_id IS NULL THEN
-    RETURN jsonb_build_object('error', 'no_event');
-  END IF;
-
-  SELECT count(*) INTO v_count
-  FROM participants
-  WHERE event_id = v_event_id;
-
-  IF v_count < 2 THEN
-    RETURN jsonb_build_object(
-      'error', 'need_at_least_2_participants',
-      'count', v_count
-    );
-  END IF;
-
-  SELECT count(*) INTO v_elim_count
-  FROM eliminations
-  WHERE event_id = v_event_id;
-
-  INSERT INTO audit_logs (event_id, admin_id, admin_email, action, details)
-  VALUES (
-    v_event_id,
-    (SELECT id FROM admins WHERE email = current_user_email()),
-    current_user_email(),
-    'start_event',
-    jsonb_build_object(
-      'deleted_eliminations', v_elim_count,
-      'participant_count', v_count,
-      'timestamp', now()
-    )
-  );
-
-  DELETE FROM eliminations WHERE event_id = v_event_id;
-
-  UPDATE participants
-  SET
-    status = 'alive',
-    eliminated_by_id = NULL,
-    eliminated_at = NULL,
-    current_target_id = NULL,
-    code = NULL,
-    updated_at = now()
-  WHERE event_id = v_event_id;
-
-  UPDATE colleges
-  SET score = 0, updated_at = now()
-  WHERE score <> 0;
-
-  SELECT array_agg(id) INTO v_ids
-  FROM participants
-  WHERE event_id = v_event_id;
-
-  FOR v_i IN 1..v_count LOOP
-    v_attempts := 0;
-    LOOP
-      v_code := '';
-      FOR v_j IN 1..v_code_len LOOP
-        v_code := v_code || substr(
-          v_alphabet,
-          floor(random() * length(v_alphabet))::int + 1,
-          1
-        );
-      END LOOP;
-      v_attempts := v_attempts + 1;
-      EXIT WHEN NOT (v_code = ANY(v_codes));
-      IF v_attempts > 200 THEN
-        RAISE EXCEPTION '无法生成唯一代码，请检查参与者数量或字母表';
-      END IF;
-    END LOOP;
-    v_codes := array_append(v_codes, v_code);
-    UPDATE participants
-    SET code = v_code, updated_at = now()
-    WHERE id = v_ids[v_i];
-  END LOOP;
-
-  FOR v_i IN REVERSE v_count..2 LOOP
-    v_j := 1 + floor(random() * v_i)::int;
-    v_tmp := v_ids[v_i];
-    v_ids[v_i] := v_ids[v_j];
-    v_ids[v_j] := v_tmp;
-  END LOOP;
-
-  FOR v_i IN 1..v_count LOOP
-    UPDATE participants
-    SET current_target_id = v_ids[(v_i % v_count) + 1],
-        updated_at = now()
-    WHERE id = v_ids[v_i];
-  END LOOP;
-
-  UPDATE events
-  SET
-    status = 'active',
-    start_at = now(),
-    end_at = NULL,
-    current_day = 1,
-    updated_at = now()
-  WHERE id = v_event_id;
-
-  RETURN jsonb_build_object('success', true, 'count', v_count);
-END;
-$function$;
-
-3. admin_kill_target（管理员在全局链中击杀）
-----------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.admin_kill_target(
-  p_hunter_id uuid,
-  p_award_points boolean DEFAULT true
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $function$
-DECLARE
-  v_event_id uuid;
-  v_event_status text;
-  v_hunter participants%ROWTYPE;
-  v_target participants%ROWTYPE;
-  v_alive_count integer;
-  v_points integer := 0;
-  v_winner_name text;
-BEGIN
-  IF NOT is_admin() THEN
-    RETURN jsonb_build_object('error', 'not_admin');
-  END IF;
-
-  SELECT id, status INTO v_event_id, v_event_status
-  FROM events
-  ORDER BY created_at DESC
-  LIMIT 1;
-
-  IF v_event_id IS NULL THEN
-    RETURN jsonb_build_object('error', 'no_event');
-  END IF;
-
-  IF v_event_status <> 'active' THEN
-    RETURN jsonb_build_object('error', 'event_not_active');
-  END IF;
-
-  SELECT * INTO v_hunter
-  FROM participants
-  WHERE id = p_hunter_id
-  FOR UPDATE;
-
-  IF v_hunter.id IS NULL THEN
-    RETURN jsonb_build_object('error', 'hunter_not_found');
-  END IF;
-  IF v_hunter.status <> 'alive' THEN
-    RETURN jsonb_build_object('error', 'hunter_not_alive');
-  END IF;
-  IF v_hunter.current_target_id IS NULL THEN
-    RETURN jsonb_build_object('error', 'hunter_no_target');
-  END IF;
-
-  SELECT * INTO v_target
-  FROM participants
-  WHERE id = v_hunter.current_target_id
-  FOR UPDATE;
-
-  IF v_target.id IS NULL THEN
-    RETURN jsonb_build_object('error', 'target_not_found');
-  END IF;
-  IF v_target.status <> 'alive' THEN
-    RETURN jsonb_build_object('error', 'target_already_eliminated');
-  END IF;
-
-  UPDATE participants
-  SET status = 'eliminated',
-      eliminated_by_id = v_hunter.id,
-      eliminated_at = now(),
-      updated_at = now()
-  WHERE id = v_target.id;
-
-  UPDATE participants
-  SET current_target_id = v_target.current_target_id,
-      updated_at = now()
-  WHERE id = v_hunter.id;
-
-  IF p_award_points THEN
-    v_points := 1;
-    UPDATE colleges
-    SET score = score + 1, updated_at = now()
-    WHERE id = v_hunter.college_id;
-  END IF;
-
-  INSERT INTO eliminations (
-    event_id, hunter_id, target_id,
-    hunter_college_id, target_college_id,
-    input_code, points_awarded, status, created_at
-  ) VALUES (
-    v_event_id, v_hunter.id, v_target.id,
-    v_hunter.college_id, v_target.college_id,
-    'ADMIN', v_points, 'valid', now()
-  );
-
-  INSERT INTO audit_logs (event_id, admin_id, admin_email, action, details)
-  VALUES (
-    v_event_id,
-    (SELECT id FROM admins WHERE email = current_user_email()),
-    current_user_email(),
-    'admin_kill',
-    jsonb_build_object(
-      'hunter_name', v_hunter.name,
-      'target_name', v_target.name,
-      'award_points', p_award_points,
-      'timestamp', now()
-    )
-  );
-
-  SELECT count(*) INTO v_alive_count
-  FROM participants
-  WHERE event_id = v_event_id AND status = 'alive';
-
-  IF v_alive_count = 1 THEN
-    UPDATE participants
-    SET status = 'winner',
-        current_target_id = NULL,
-        updated_at = now()
-    WHERE event_id = v_event_id AND status = 'alive';
-
-    UPDATE events
-    SET status = 'ended',
-        end_at = now(),
-        updated_at = now()
-    WHERE id = v_event_id;
-
-    SELECT name INTO v_winner_name
-    FROM participants
-    WHERE event_id = v_event_id AND status = 'winner'
-    LIMIT 1;
-
-    RETURN jsonb_build_object(
-      'success', true,
-      'winner', true,
-      'winner_name', v_winner_name
-    );
-  END IF;
-
-  RETURN jsonb_build_object('success', true, 'winner', false);
-END;
-$function$;
-
-4. 审计日志相关 RPC
-----------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.admin_get_audit_logs()
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $function$
-DECLARE
-  v_logs jsonb;
-BEGIN
-  IF NOT is_admin() THEN
-    RETURN jsonb_build_object('error', 'not_admin');
-  END IF;
-
-  SELECT jsonb_agg(
-    jsonb_build_object(
-      'id', id,
-      'event_id', event_id,
-      'admin_email', admin_email,
-      'action', action,
-      'details', details,
-      'created_at', created_at
-    ) ORDER BY created_at DESC
-  ) INTO v_logs
-  FROM audit_logs;
-
-  RETURN COALESCE(v_logs, '[]'::jsonb);
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.admin_delete_audit_log(p_log_id uuid)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $function$
-BEGIN
-  IF NOT is_admin() THEN
-    RETURN jsonb_build_object('error', 'not_admin');
-  END IF;
-
-  DELETE FROM audit_logs WHERE id = p_log_id;
-
-  RETURN jsonb_build_object('success', true);
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.admin_clear_audit_logs()
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $function$
-BEGIN
-  IF NOT is_admin() THEN
-    RETURN jsonb_build_object('error', 'not_admin');
-  END IF;
-
-  DELETE FROM audit_logs WHERE id IS NOT NULL;
-
-  RETURN jsonb_build_object('success', true);
-END;
-$function$;
 
 ================================================================
 文档结束

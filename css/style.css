@@ -469,3 +469,25 @@ select {
     align-items: flex-start;
   }
 }
+
+.section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.section-toggle input {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+.section-toggle span {
+  white-space: nowrap;
+}

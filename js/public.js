@@ -4,6 +4,67 @@ import { getSession, signOut } from './auth.js';
 import { escapeHtml } from './utils.js';
 
 let pollTimer = null;
+let isAdminUser = false;
+let sectionVisibility = {};
+
+// ==== 可见性 ====
+async function initVisibility() {
+  const session = await getSession();
+  if (session) {
+    const { data } = await supabase.rpc('is_admin');
+    isAdminUser = data === true;
+  }
+
+  const { data: vis } = await supabase.rpc('get_home_section_visibility');
+  sectionVisibility = (vis && typeof vis === 'object') ? vis : {};
+
+  applySectionVisibility();
+  if (isAdminUser) bindSectionToggles();
+}
+
+function applySectionVisibility() {
+  document.querySelectorAll('[data-section]').forEach(el => {
+    const key = el.dataset.section;
+    if (key === 'winner') return; // winner 由 renderWinner 处理
+
+    const visible = sectionVisibility[key] !== false;
+    el.style.display = (isAdminUser || visible) ? '' : 'none';
+
+    if (isAdminUser) {
+      const label = el.querySelector('.section-toggle');
+      if (label) {
+        label.style.display = 'inline-flex';
+        const cb = label.querySelector('input');
+        if (cb) cb.checked = visible;
+      }
+    }
+  });
+}
+
+function bindSectionToggles() {
+  document.querySelectorAll('[data-toggle-section]').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      const key = cb.dataset.toggleSection;
+      const visible = cb.checked;
+      cb.disabled = true;
+
+      const { data, error } = await supabase.rpc('admin_set_home_section_visibility', {
+        p_key: key,
+        p_visible: visible,
+      });
+
+      cb.disabled = false;
+
+      if (error || data?.error) {
+        alert('保存失败：' + (error?.message || data?.error));
+        cb.checked = !visible;
+        sectionVisibility[key] = !visible;
+        return;
+      }
+      sectionVisibility[key] = visible;
+    });
+  });
+}
 
 async function loadPublicHome() {
   const { data, error } = await supabase.rpc('get_public_home');
@@ -100,6 +161,7 @@ function renderAliveWall(list) {
 
 function renderWinner(data) {
   if (data.event.status !== 'ended') return;
+  if (!isAdminUser && sectionVisibility['winner'] === false) return;
 
   const el = document.getElementById('winner');
   el.style.display = 'block';
@@ -138,20 +200,24 @@ function renderWinner(data) {
 async function updateNav() {
   const session = await getSession();
   const navLogin = document.getElementById('nav-login');
-  const navMe = document.getElementById('nav-me');
   const navAdmin = document.getElementById('nav-admin');
   const navLogout = document.getElementById('nav-logout');
 
   if (session) {
-    navLogin.style.display = 'none';
-    navMe.style.display = '';
-    navLogout.style.display = '';
-    // 简单判断管理员
     const { data } = await supabase.rpc('is_admin');
-    if (data === true) navAdmin.style.display = '';
+    if (data === true) {
+      navLogin.style.display = 'none';
+      navAdmin.style.display = '';
+      navLogout.style.display = '';
+    } else {
+      // 非管理员登录状态：直接退出
+      await supabase.auth.signOut();
+      navLogin.style.display = '';
+      navAdmin.style.display = 'none';
+      navLogout.style.display = 'none';
+    }
   } else {
     navLogin.style.display = '';
-    navMe.style.display = 'none';
     navAdmin.style.display = 'none';
     navLogout.style.display = 'none';
   }
@@ -171,6 +237,7 @@ function startPolling() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   bindEvents();
+  await initVisibility();   // 新增
   await updateNav();
   await loadPublicHome();
   startPolling();

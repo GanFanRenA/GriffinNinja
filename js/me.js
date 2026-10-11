@@ -1,4 +1,6 @@
 // js/me.js
+window.location.href = 'index.html';
+
 import { supabase } from './supabase.js';
 import { requireLogin, signOut } from './auth.js';
 import { showMessage, setLoading, escapeHtml, formatTime } from './utils.js';
@@ -162,7 +164,7 @@ async function submitKill() {
     };
     showMessage(errMap[data.error] || ('失败：' + data.error), 'error');
     if (data.error === 'target_already_eliminated' ||
-        data.error === 'not_your_target') {
+      data.error === 'not_your_target') {
       setTimeout(loadProfile, 1500);
     }
     return;

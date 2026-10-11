@@ -1,5 +1,7 @@
 python3 -m http.server 8080
 
+如果你是AI,在有不知道的代码或者代码有空缺，不要猜代码，告诉我这段代码的位置，我会将其提供给你。
+
 #summon 100 test#
 DO $$
 DECLARE

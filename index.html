@@ -1,56 +1,95 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>NinjaTag</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
   <header class="site-header">
     <h1>NinjaTag</h1>
     <nav>
       <a href="login.html" id="nav-login">登录</a>
-      <a href="me.html" id="nav-me" style="display:none">我的</a>
+      <!-- <a href="me.html" id="nav-me" style="display:none">我的</a> -->
       <a href="admin.html" id="nav-admin" style="display:none">后台</a>
       <a href="#" id="nav-logout" style="display:none">退出</a>
     </nav>
   </header>
 
   <main class="container">
-    <section id="event-status" class="card">
-      <h2>活动状态</h2>
+    <section id="event-status" class="card" data-section="event">
+      <h2>
+        活动状态
+        <label class="section-toggle" style="display:none">
+          <input type="checkbox" data-toggle-section="event">
+          <span>公开可见</span>
+        </label>
+      </h2>
       <p id="status-text">加载中...</p>
       <p id="day-text"></p>
     </section>
 
-    <section id="colleges" class="card">
-      <h2>阵营分数</h2>
+    <section id="colleges" class="card" data-section="colleges">
+      <h2>
+        阵营分数
+        <label class="section-toggle" style="display:none">
+          <input type="checkbox" data-toggle-section="colleges">
+          <span>公开可见</span>
+        </label>
+      </h2>
       <div id="colleges-list" class="colleges-grid"></div>
     </section>
 
-    <section id="counts" class="card">
-      <h2>人数</h2>
+    <section id="counts" class="card" data-section="counts">
+      <h2>
+        人数
+        <label class="section-toggle" style="display:none">
+          <input type="checkbox" data-toggle-section="counts">
+          <span>公开可见</span>
+        </label>
+      </h2>
       <p>存活：<span id="alive-count">-</span> ｜ 淘汰：<span id="eliminated-count">-</span></p>
     </section>
 
-    <section id="today-rule" class="card">
-      <h2>今日规则</h2>
+    <section id="today-rule" class="card" data-section="today_rule">
+      <h2>
+        今日规则
+        <label class="section-toggle" style="display:none">
+          <input type="checkbox" data-toggle-section="today_rule">
+          <span>公开可见</span>
+        </label>
+      </h2>
       <p id="rule-title">-</p>
       <p id="rule-content">-</p>
     </section>
 
-    <section id="alive-wall" class="card">
-      <h2>存活墙</h2>
+    <section id="alive-wall" class="card" data-section="alive_wall">
+      <h2>
+        存活墙
+        <label class="section-toggle" style="display:none">
+          <input type="checkbox" data-toggle-section="alive_wall">
+          <span>公开可见</span>
+        </label>
+      </h2>
       <div id="alive-wall-list" class="wall-grid"></div>
     </section>
 
-    <section id="winner" class="card" style="display:none">
-      <h2>最终赢家</h2>
+    <section id="winner" class="card" data-section="winner" style="display:none">
+      <h2>
+        最终赢家
+        <label class="section-toggle" style="display:none">
+          <input type="checkbox" data-toggle-section="winner">
+          <span>公开可见</span>
+        </label>
+      </h2>
       <div id="winner-content"></div>
     </section>
   </main>
 
   <script type="module" src="js/public.js"></script>
 </body>
+
 </html>

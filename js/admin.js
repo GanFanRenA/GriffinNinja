@@ -31,6 +31,7 @@ function loadTab(name) {
         chain: loadChain,
         eliminations: loadEliminations,
         reports: loadReports,
+        admins: loadAdmins,
     };
     map[name]?.();
 }
@@ -484,6 +485,82 @@ function filterChain() {
     renderChain(filtered);
 }
 
+// ============ 管理员 ============
+async function loadAdmins() {
+    const { data, error } = await supabase.rpc('admin_get_admins');
+    if (error || data?.error) {
+        document.getElementById('admins-list').textContent = '加载失败';
+        return;
+    }
+
+    const el = document.getElementById('admins-list');
+    if (!data.length) {
+        el.innerHTML = '<p class="hint">暂无管理员</p>';
+        return;
+    }
+
+    el.innerHTML = data.map(a => `
+        <div class="admin-row">
+            <span class="admin-name">${escapeHtml(a.name || '未命名')}</span>
+            <span class="admin-meta">${escapeHtml(a.email)}</span>
+            <button class="btn-mini btn-warn"
+        data-delete-admin="${a.id}"
+        data-name="${escapeHtml(a.name || a.email)}">移除</button>
+        </div>
+    `).join('');
+
+    el.querySelectorAll('[data-delete-admin]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const name = btn.dataset.name || '该管理员';
+
+            if (!confirm(`是否确认将'${name}'的管理员职责移除？`)) return;
+
+            const { data: res, error: err } = await supabase.rpc('admin_delete_admin', {
+                p_id: btn.dataset.deleteAdmin,
+            });
+
+            if (err || res?.error) {
+                const errMap = {
+                    not_admin: '你不是管理员',
+                    admin_not_found: '该管理员不存在，可能已被删除',
+                    cannot_delete_self: '不能移除自己的管理员职责',
+                    must_keep_one_admin: '至少需要保留一名管理员',
+                };
+                showMessage('删除失败：' + (errMap[res?.error] || err?.message || res?.error), 'error');
+                return;
+            }
+
+            showMessage('已移除管理员职责', 'success');
+            loadAdmins();
+        });
+    });
+}
+
+async function addAdmin() {
+    const email = document.getElementById('admin-email').value.trim();
+    const name = document.getElementById('admin-name').value.trim();
+
+    if (!email) {
+        showMessage('请输入邮箱', 'error');
+        return;
+    }
+
+    const { data, error } = await supabase.rpc('admin_add_admin', {
+        p_email: email,
+        p_name: name || null,
+    });
+
+    if (error || data?.error) {
+        showMessage('添加失败：' + (error?.message || data?.error), 'error');
+        return;
+    }
+
+    document.getElementById('admin-email').value = '';
+    document.getElementById('admin-name').value = '';
+    showMessage('已添加', 'success');
+    loadAdmins();
+}
+
 // ============ 击杀记录 ============
 async function loadEliminations() {
     const { data, error } = await supabase.rpc('admin_get_eliminations');
@@ -603,6 +680,11 @@ function bindEvents() {
         ?.addEventListener('click', loadEliminations);
     document.getElementById('btn-refresh-reports')
         ?.addEventListener('click', loadReports);
+
+    document.getElementById('btn-add-admin')
+        ?.addEventListener('click', addAdmin);
+    document.getElementById('btn-refresh-admins')
+        ?.addEventListener('click', loadAdmins);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

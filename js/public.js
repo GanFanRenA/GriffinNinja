@@ -1,9 +1,9 @@
 // js/public.js
-// 公共主页：活动状态、阵营分、人数、今日规则、存活墙、赢家
+// 公共主页：活动状态、阵营分、人数、今日规则、存活墙、最终赢家
 
 import { supabase } from './supabase.js';
 import { getSession, signOut } from './auth.js';
-import { qs, escapeHtml, emptyState } from './utils.js';
+import { qs, escapeHtml, formatTime, emptyState } from './utils.js';
 
 const POLL_INTERVAL = 5000;
 
@@ -11,7 +11,10 @@ let pollTimer = null;
 let isAdminUser = false;
 let sectionVisibility = {};
 let lastAliveWallKey = '';
-let lastStatusKey = '';
+
+// 赢家统计缓存（避免每次轮询都请求）
+let winnerStatsCache = null;
+let winnerStatsEventKey = null;
 
 /* ============================================================
    可见性
@@ -34,10 +37,15 @@ function applySectionVisibility() {
   document.querySelectorAll('[data-section]').forEach(el => {
     const key = el.dataset.section;
     if (key === 'winner') return; // winner 由 renderWinner 处理
-
     const visible = sectionVisibility[key] !== false;
     el.style.display = (isAdminUser || visible) ? '' : 'none';
   });
+}
+
+// 判断某个子开关是否可见
+function isSubVisible(key) {
+  if (isAdminUser) return true;
+  return sectionVisibility[key] !== false;
 }
 
 /* ============================================================
@@ -65,26 +73,16 @@ async function loadPublicHome() {
   renderCounts(data);
   renderTodayRule(data.today_rule);
   renderAliveWall(data.alive_wall || []);
-  renderWinner(data);
+  await renderWinner(data);
 }
 
 /* ============================================================
-   渲染
+   渲染：状态 / 阵营 / 人数 / 规则 / 存活墙
    ============================================================ */
 
 function renderEvent(data) {
-  const statusMap = {
-    draft: '未开始',
-    active: '进行中',
-    paused: '已暂停',
-    ended: '已结束',
-  };
-  const badgeCls = {
-    draft: 'badge-neutral',
-    active: 'badge-success',
-    paused: 'badge-warning',
-    ended: 'badge-neutral',
-  };
+  const statusMap = { draft: '未开始', active: '进行中', paused: '已暂停', ended: '已结束' };
+  const badgeCls = { draft: 'badge-neutral', active: 'badge-success', paused: 'badge-warning', ended: 'badge-neutral' };
   const status = data.event.status;
 
   const statusEl = qs('status-text');
@@ -146,16 +144,12 @@ function renderAliveWall(list) {
   const el = qs('alive-wall-list');
   if (!el) return;
 
-  // 数据指纹：避免无变化重绘
   const key = list.map(p => `${p.id}|${p.photo_url || ''}|${p.name}|${p.college_name || ''}`).join(',');
   if (key === lastAliveWallKey) return;
   lastAliveWallKey = key;
 
   if (!list.length) {
-    el.innerHTML = emptyState({
-      icon: 'user',
-      title: '暂无存活者',
-    });
+    el.innerHTML = emptyState({ icon: 'user', title: '暂无存活者' });
     return;
   }
 
@@ -173,16 +167,39 @@ function renderAliveWall(list) {
   `).join('');
 }
 
-function renderWinner(data) {
+/* ============================================================
+   最终赢家：4 个独立奖项
+   ============================================================ */
+
+async function loadWinnerStats(eventKey) {
+  if (winnerStatsCache && winnerStatsEventKey === eventKey) {
+    return winnerStatsCache;
+  }
+
+  const { data, error } = await supabase.rpc('get_winner_stats');
+  if (error || data?.error) {
+    console.error('get_winner_stats 失败:', error || data?.error);
+    return null;
+  }
+
+  winnerStatsCache = data;
+  winnerStatsEventKey = eventKey;
+  return data;
+}
+
+async function renderWinner(data) {
   const el = qs('winner');
   if (!el) return;
 
+  // 只在活动结束时显示
   if (data.event.status !== 'ended') {
     el.style.display = 'none';
+    winnerStatsCache = null;
+    winnerStatsEventKey = null;
     return;
   }
 
-  // 可见性由后端配置决定；管理员始终可见
+  // 总开关
   if (!isAdminUser && sectionVisibility['winner'] === false) {
     el.style.display = 'none';
     return;
@@ -190,40 +207,87 @@ function renderWinner(data) {
 
   el.style.display = '';
 
-  const winner = data.winner;
-  const college = data.winning_college;
+  const eventKey = data.event.id || 'default';
+  const stats = await loadWinnerStats(eventKey);
+  const contentEl = qs('winner-content');
+  if (!contentEl) return;
 
-  let html = '';
-  if (winner) {
-    html += `
-      <div class="winner-card">
-        <img src="${escapeHtml(winner.photo_url || 'assets/placeholder.png')}"
-             alt="${escapeHtml(winner.name)}"
-             onerror="this.onerror=null;this.src='assets/placeholder.png'">
-        <div>
-          <div class="winner-label">个人赢家</div>
-          <div class="winner-name">${escapeHtml(winner.name)}</div>
-          <div class="winner-college">${escapeHtml(winner.college_name || '')}</div>
-        </div>
-      </div>
-    `;
-  }
-  if (college) {
-    html += `
-      <div class="winner-card">
-        <div>
-          <div class="winner-label">阵营赢家</div>
-          <div class="winner-name">${escapeHtml(college.name)}</div>
-          <div class="winner-college">${college.score} 分</div>
-        </div>
-      </div>
-    `;
+  if (!stats) {
+    contentEl.innerHTML = '<p class="hint">暂无赢家数据。</p>';
+    return;
   }
 
-  const content = qs('winner-content');
-  if (content) {
-    content.innerHTML = html || '<p class="hint">暂无赢家数据。</p>';
+  const parts = [];
+
+  // 1. 个人赢家
+  if (isSubVisible('winner_personal') && stats.personal) {
+    parts.push(winnerCard({
+      label: '个人赢家',
+      icon: '🏆',
+      name: stats.personal.name,
+      photo: stats.personal.photo_url,
+      sub: stats.personal.college_name || '',
+      color: stats.personal.color || '',
+    }));
   }
+
+  // 2. 阵营赢家
+  if (isSubVisible('winner_college') && stats.college) {
+    parts.push(winnerCard({
+      label: '阵营赢家',
+      icon: '🛡️',
+      name: stats.college.name,
+      photo: null,
+      sub: `${stats.college.score ?? 0} 分`,
+      color: stats.college.color || '',
+    }));
+  }
+
+  // 3. 最多淘汰
+  if (isSubVisible('winner_most_kills') && stats.most_kills) {
+    parts.push(winnerCard({
+      label: '最多淘汰',
+      icon: '⚔️',
+      name: stats.most_kills.name,
+      photo: stats.most_kills.photo_url,
+      sub: `${stats.most_kills.college_name || ''} · ${stats.most_kills.kill_count} 次击杀`,
+      color: stats.most_kills.color || '',
+    }));
+  }
+
+  // 4. 最快阵亡
+  if (isSubVisible('winner_fastest_death') && stats.fastest_death) {
+    parts.push(winnerCard({
+      label: '最快阵亡',
+      icon: '💀',
+      name: stats.fastest_death.name,
+      photo: stats.fastest_death.photo_url,
+      sub: `${stats.fastest_death.college_name || ''} · ${formatTime(stats.fastest_death.eliminated_at)}`,
+      color: stats.fastest_death.color || '',
+    }));
+  }
+
+  contentEl.innerHTML = parts.length
+    ? parts.join('')
+    : '<p class="hint">未开启任何奖项显示。</p>';
+}
+
+function winnerCard({ label, icon, name, photo, sub, color }) {
+  const imgHtml = photo
+    ? `<img src="${escapeHtml(photo)}" alt="${escapeHtml(name)}"
+            onerror="this.onerror=null;this.src='assets/placeholder.png'">`
+    : `<div class="winner-emoji">${icon}</div>`;
+
+  return `
+    <div class="winner-card">
+      ${imgHtml}
+      <div>
+        <div class="winner-label">${icon} ${escapeHtml(label)}</div>
+        <div class="winner-name">${escapeHtml(name || '—')}</div>
+        ${sub ? `<div class="winner-college" style="color:${escapeHtml(color || '')}">${escapeHtml(sub)}</div>` : ''}
+      </div>
+    </div>
+  `;
 }
 
 /* ============================================================
@@ -244,7 +308,6 @@ async function updateNav() {
       navAdmin.style.display = '';
       navLogout.style.display = '';
     } else {
-      // 非管理员登录状态：静默退出
       await supabase.auth.signOut();
       navLogin.style.display = '';
       navAdmin.style.display = 'none';
@@ -266,7 +329,6 @@ function startPolling() {
   pollTimer = setInterval(loadPublicHome, POLL_INTERVAL);
 }
 
-// 页面不可见时暂停轮询
 function bindVisibilityChange() {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {

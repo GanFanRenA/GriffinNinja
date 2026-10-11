@@ -1948,3 +1948,14 @@ label.radio input {
     transition-duration: 0.01ms !important;
   }
 }
+
+.winner-emoji {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--elevated);
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}

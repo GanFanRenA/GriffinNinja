@@ -192,6 +192,7 @@ function renderHero() {
     `;
     } else {
         actions.innerHTML = `
+      <button class="btn btn-primary" data-action="start">开始新活动</button>
       <button class="btn btn-secondary" data-goto="records">查看记录</button>
     `;
     }
@@ -335,11 +336,30 @@ function fillEventForm() {
    ============================================================ */
 
 async function handleStart(btn) {
+    const isRestart = state.event?.status === 'ended';
+
+    const message = isRestart
+        ? '将开始一轮全新活动：<br>' +
+        '· 所有参与者重置为「存活」<br>' +
+        '· 重新生成代码与击杀环<br>' +
+        '<strong style="color:#fca5a5">· 清空所有击杀记录</strong><br>' +
+        '<strong style="color:#fca5a5">· 学院分数归零</strong><br>' +
+        '此操作不可撤销。如需保留记录，请先导出。'
+        : '将开始活动：<br>' +
+        '· 所有参与者重置为「存活」<br>' +
+        '· 生成新代码与击杀环<br>' +
+        '· 学院分数归零';
+
     const ok = await confirmDialog({
-        title: '开始活动',
-        message: '将重置所有参与者状态、生成新代码、随机生成击杀环，并把所有学院分归零。已有的击杀记录将被清空。',
-        confirmText: '开始活动',
+        title: isRestart ? '开始新活动' : '开始活动',
+        message,
+        confirmText: isRestart ? '开始新活动' : '开始活动',
         danger: true,
+        requireInput: {
+            label: `请输入「${isRestart ? '开始新活动' : '开始活动'}」以确认`,
+            value: isRestart ? '开始新活动' : '开始活动',
+            placeholder: isRestart ? '开始新活动' : '开始活动',
+        },
     });
     if (!ok) return;
 
@@ -351,7 +371,7 @@ async function handleStart(btn) {
         showToast('开始失败：' + (error?.message || data?.error), 'error');
         return;
     }
-    showToast(`活动已开始，共 ${data?.count ?? '?'} 人`, 'success');
+    showToast(`新活动已开始，共 ${data?.count ?? '?'} 人`, 'success');
     loadOverview();
 }
 

@@ -3,7 +3,9 @@ import { supabase } from './supabase.js';
 import { showMessage, setLoading } from './utils.js';
 import { routeAfterLogin } from './auth.js';
 
-const SCHOOL_DOMAIN = '@bjsmicschool.com';
+/* ============================================================
+   会话检查
+   ============================================================ */
 
 async function checkExistingSession() {
   const { data } = await supabase.auth.getSession();
@@ -14,71 +16,64 @@ async function checkExistingSession() {
   return false;
 }
 
-function isValidSchoolEmail(email) {
-  return email.endsWith(SCHOOL_DOMAIN);
+/* ============================================================
+   输入解析：邮箱 / 姓名
+   ============================================================ */
+
+function looksLikeEmail(s) {
+  return s.includes('@');
 }
 
-async function sendMagicLink(email) {
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: window.location.origin + '/login.html',
-    },
+async function resolveEmail(input) {
+  if (looksLikeEmail(input)) return input;
+
+  // 通过 admins.name 反查 email，需后端 RPC resolve_login_email
+  const { data, error } = await supabase.rpc('resolve_login_email', {
+    p_name: input,
   });
-  if (error) throw error;
+
+  if (error) throw new Error('无法解析名称：' + error.message);
+  if (!data) throw new Error('未找到该名称对应的账号');
+  return data;
 }
+
+/* ============================================================
+   登录
+   ============================================================ */
+
+async function handleLogin(btn) {
+  const input = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  if (!input) { showMessage('请输入邮箱或姓名', 'error'); return; }
+  if (!password) { showMessage('请输入密码', 'error'); return; }
+
+  setLoading(btn, true, '登录中...');
+
+  try {
+    const email = await resolveEmail(input.toLowerCase());
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+
+    await routeAfterLogin();
+  } catch (err) {
+    showMessage(err.message || '登录失败', 'error');
+    setLoading(btn, false);
+  }
+}
+
+/* ============================================================
+   启动
+   ============================================================ */
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // 若已登录，直接跳转
   const alreadyLoggedIn = await checkExistingSession();
   if (alreadyLoggedIn) return;
 
-  const btnSend = document.getElementById('btn-send');
-  const inputEmail = document.getElementById('email');
-  const btnTestLogin = document.getElementById('btn-test-login');
+  const btn = document.getElementById('btn-login');
+  btn?.addEventListener('click', () => handleLogin(btn));
 
-  // 测试用密码登录
-  btnTestLogin?.addEventListener('click', async () => {
-    const email = document.getElementById('test-email').value.trim().toLowerCase();
-    const password = document.getElementById('test-password').value;
-
-    if (!email || !password) {
-      showMessage('请输入测试邮箱和密码', 'error');
-      return;
-    }
-
-    setLoading(btnTestLogin, true, '登录中...');
-    try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      await routeAfterLogin();
-    } catch (err) {
-      showMessage(err.message || '登录失败', 'error');
-      setLoading(btnTestLogin, false);
-    }
-  });
-
-  btnSend.addEventListener('click', async () => {
-    const email = inputEmail.value.trim().toLowerCase();
-
-    if (!email) {
-      showMessage('请输入邮箱', 'error');
-      return;
-    }
-    if (!isValidSchoolEmail(email)) {
-      showMessage('请使用学校邮箱登录', 'error');
-      return;
-    }
-
-    setLoading(btnSend, true, '发送中...');
-    try {
-      await sendMagicLink(email);
-      document.getElementById('step-email').style.display = 'none';
-      document.getElementById('step-sent').style.display = 'block';
-    } catch (err) {
-      showMessage(err.message || '发送失败', 'error');
-    } finally {
-      setLoading(btnSend, false);
-    }
+  document.getElementById('password')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); btn?.click(); }
   });
 });

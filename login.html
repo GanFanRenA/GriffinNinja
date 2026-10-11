@@ -19,27 +19,25 @@
   <main class="container">
     <section class="card">
       <h2>管理员登录</h2>
-      <p>仅限管理员使用学校邮箱登录。</p>
+      <p class="hint">使用学校邮箱（或姓名）与密码登录。</p>
 
       <div id="message" class="message" style="display:none"></div>
 
-      <div id="step-email">
-        <label for="email">学校邮箱</label>
-        <input type="email" id="email" placeholder="your@school.edu" autocomplete="email">
-        <button id="btn-send" class="btn-primary">发送登录链接</button>
-
-        <div style="margin-top:24px;border-top:1px solid #2a2e36;padding-top:16px">
-          <p class="hint">测试用密码登录</p>
-          <input type="email" id="test-email" placeholder="测试邮箱">
-          <input type="password" id="test-password" placeholder="密码">
-          <button id="btn-test-login" class="btn-secondary">密码登录</button>
-        </div>
+      <div class="field">
+        <label for="email">邮箱 / 姓名</label>
+        <input type="text" id="email" placeholder="your@school.edu 或 姓名" autocomplete="username">
       </div>
 
-      <div id="step-sent" style="display:none">
-        <p>登录链接已发送到你的邮箱，请查收并点击链接。</p>
-        <p class="hint">如果没有收到，请检查垃圾邮件。</p>
+      <div class="field">
+        <label for="password">密码</label>
+        <input type="password" id="password" placeholder="密码" autocomplete="current-password">
       </div>
+
+      <button id="btn-login" class="btn btn-primary btn-block">登录</button>
+
+      <p class="hint" style="margin-top:16px;text-align:center">
+        还没有账号？<a href="register.html">注册</a>
+      </p>
     </section>
   </main>
 

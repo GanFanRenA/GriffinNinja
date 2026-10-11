@@ -1,13 +1,22 @@
 // js/public.js
+// 公共主页：活动状态、阵营分、人数、今日规则、存活墙、赢家
+
 import { supabase } from './supabase.js';
 import { getSession, signOut } from './auth.js';
-import { escapeHtml } from './utils.js';
+import { qs, escapeHtml, emptyState } from './utils.js';
+
+const POLL_INTERVAL = 5000;
 
 let pollTimer = null;
 let isAdminUser = false;
 let sectionVisibility = {};
+let lastAliveWallKey = '';
+let lastStatusKey = '';
 
-// ==== 可见性 ====
+/* ============================================================
+   可见性
+   ============================================================ */
+
 async function initVisibility() {
   const session = await getSession();
   if (session) {
@@ -19,7 +28,6 @@ async function initVisibility() {
   sectionVisibility = (vis && typeof vis === 'object') ? vis : {};
 
   applySectionVisibility();
-  if (isAdminUser) bindSectionToggles();
 }
 
 function applySectionVisibility() {
@@ -29,54 +37,26 @@ function applySectionVisibility() {
 
     const visible = sectionVisibility[key] !== false;
     el.style.display = (isAdminUser || visible) ? '' : 'none';
-
-    if (isAdminUser) {
-      const label = el.querySelector('.section-toggle');
-      if (label) {
-        label.style.display = 'inline-flex';
-        const cb = label.querySelector('input');
-        if (cb) cb.checked = visible;
-      }
-    }
   });
 }
 
-function bindSectionToggles() {
-  document.querySelectorAll('[data-toggle-section]').forEach(cb => {
-    cb.addEventListener('change', async () => {
-      const key = cb.dataset.toggleSection;
-      const visible = cb.checked;
-      cb.disabled = true;
-
-      const { data, error } = await supabase.rpc('admin_set_home_section_visibility', {
-        p_key: key,
-        p_visible: visible,
-      });
-
-      cb.disabled = false;
-
-      if (error || data?.error) {
-        alert('保存失败：' + (error?.message || data?.error));
-        cb.checked = !visible;
-        sectionVisibility[key] = !visible;
-        return;
-      }
-      sectionVisibility[key] = visible;
-    });
-  });
-}
+/* ============================================================
+   加载数据
+   ============================================================ */
 
 async function loadPublicHome() {
   const { data, error } = await supabase.rpc('get_public_home');
 
   if (error) {
     console.error('加载公共主页失败:', error);
-    document.getElementById('status-text').textContent = '加载失败';
+    const statusEl = qs('status-text');
+    if (statusEl) statusEl.textContent = '加载失败';
     return;
   }
 
   if (!data || !data.event) {
-    document.getElementById('status-text').textContent = '活动尚未创建';
+    const statusEl = qs('status-text');
+    if (statusEl) statusEl.textContent = '活动尚未创建';
     return;
   }
 
@@ -88,6 +68,10 @@ async function loadPublicHome() {
   renderWinner(data);
 }
 
+/* ============================================================
+   渲染
+   ============================================================ */
+
 function renderEvent(data) {
   const statusMap = {
     draft: '未开始',
@@ -95,76 +79,116 @@ function renderEvent(data) {
     paused: '已暂停',
     ended: '已结束',
   };
-  document.getElementById('status-text').textContent =
-    statusMap[data.event.status] || data.event.status;
-  document.getElementById('day-text').textContent =
-    data.event.status === 'active' ? `第 ${data.event.current_day} 天` : '';
+  const badgeCls = {
+    draft: 'badge-neutral',
+    active: 'badge-success',
+    paused: 'badge-warning',
+    ended: 'badge-neutral',
+  };
+  const status = data.event.status;
+
+  const statusEl = qs('status-text');
+  if (statusEl) {
+    statusEl.innerHTML =
+      `<span class="badge ${badgeCls[status] || 'badge-neutral'}">` +
+      `<span class="dot"></span>${escapeHtml(statusMap[status] || status)}</span>`;
+  }
+
+  const dayEl = qs('day-text');
+  if (dayEl) {
+    dayEl.textContent = status === 'active' && data.event.current_day
+      ? `第 ${data.event.current_day} 天`
+      : '';
+  }
 }
 
 function renderColleges(colleges) {
-  const el = document.getElementById('colleges-list');
+  const el = qs('colleges-list');
+  if (!el) return;
+
+  if (!colleges.length) {
+    el.innerHTML = emptyState({ title: '暂无阵营数据' });
+    return;
+  }
+
   el.innerHTML = colleges.map(c => `
-    <div class="college-card" style="border-color:${escapeHtml(c.color)}">
-      <div class="college-name" style="background:${escapeHtml(c.color)}">
+    <div class="college-card" style="border-color:${escapeHtml(c.color || '#555')}">
+      <div class="college-name" style="background:${escapeHtml(c.color || '#555')}">
         ${escapeHtml(c.name)}
       </div>
-      <div class="college-score">${c.score}</div>
+      <div class="college-score">${c.score ?? 0}</div>
     </div>
   `).join('');
 }
 
 function renderCounts(data) {
-  document.getElementById('alive-count').textContent = data.alive_count ?? 0;
-  document.getElementById('eliminated-count').textContent = data.eliminated_count ?? 0;
+  const alive = qs('alive-count');
+  const elim = qs('eliminated-count');
+  if (alive) alive.textContent = data.alive_count ?? 0;
+  if (elim) elim.textContent = data.eliminated_count ?? 0;
 }
 
 function renderTodayRule(rule) {
+  const titleEl = qs('rule-title');
+  const contentEl = qs('rule-content');
+  if (!titleEl || !contentEl) return;
+
   if (!rule) {
-    document.getElementById('rule-title').textContent = '今日无特殊规则';
-    document.getElementById('rule-content').textContent = '';
+    titleEl.textContent = '今日无特殊规则';
+    contentEl.textContent = '';
     return;
   }
-  document.getElementById('rule-title').textContent = rule.title || '';
-  document.getElementById('rule-content').textContent = rule.content || '';
+  titleEl.textContent = rule.title || '';
+  contentEl.textContent = rule.content || '';
 }
-let lastAliveWallKey = '';
 
 function renderAliveWall(list) {
-  const el = document.getElementById('alive-wall-list');
+  const el = qs('alive-wall-list');
+  if (!el) return;
 
-  // 生成数据指纹，用于判断是否变化
-  const key = list.map(p => `${p.id}|${p.photo_url || ''}|${p.name}`).join(',');
-
-  if (key === lastAliveWallKey) {
-    return; // 数据没变，不重渲染
-  }
+  // 数据指纹：避免无变化重绘
+  const key = list.map(p => `${p.id}|${p.photo_url || ''}|${p.name}|${p.college_name || ''}`).join(',');
+  if (key === lastAliveWallKey) return;
   lastAliveWallKey = key;
 
   if (!list.length) {
-    el.innerHTML = '<p>暂无存活者</p>';
+    el.innerHTML = emptyState({
+      icon: 'user',
+      title: '暂无存活者',
+    });
     return;
   }
 
   el.innerHTML = list.map(p => `
     <div class="wall-item">
       <img src="${escapeHtml(p.photo_url || 'assets/placeholder.png')}"
-           alt=""
+           alt="${escapeHtml(p.name)}"
            loading="lazy"
            onerror="this.onerror=null;this.src='assets/placeholder.png'">
       <div class="wall-name">${escapeHtml(p.name)}</div>
-      <div class="wall-college" style="color:${escapeHtml(p.color)}">
-        ${escapeHtml(p.college_name)}
+      <div class="wall-college" style="color:${escapeHtml(p.color || '')}">
+        ${escapeHtml(p.college_name || '')}
       </div>
     </div>
   `).join('');
 }
 
 function renderWinner(data) {
-  if (data.event.status !== 'ended') return;
-  if (!isAdminUser && sectionVisibility['winner'] === false) return;
+  const el = qs('winner');
+  if (!el) return;
 
-  const el = document.getElementById('winner');
-  el.style.display = 'block';
+  if (data.event.status !== 'ended') {
+    el.style.display = 'none';
+    return;
+  }
+
+  // 可见性由后端配置决定；管理员始终可见
+  if (!isAdminUser && sectionVisibility['winner'] === false) {
+    el.style.display = 'none';
+    return;
+  }
+
+  el.style.display = '';
 
   const winner = data.winner;
   const college = data.winning_college;
@@ -174,11 +198,12 @@ function renderWinner(data) {
     html += `
       <div class="winner-card">
         <img src="${escapeHtml(winner.photo_url || 'assets/placeholder.png')}"
-             alt="${escapeHtml(winner.name)}">
+             alt="${escapeHtml(winner.name)}"
+             onerror="this.onerror=null;this.src='assets/placeholder.png'">
         <div>
           <div class="winner-label">个人赢家</div>
           <div class="winner-name">${escapeHtml(winner.name)}</div>
-          <div class="winner-college">${escapeHtml(winner.college_name)}</div>
+          <div class="winner-college">${escapeHtml(winner.college_name || '')}</div>
         </div>
       </div>
     `;
@@ -194,14 +219,23 @@ function renderWinner(data) {
       </div>
     `;
   }
-  document.getElementById('winner-content').innerHTML = html;
+
+  const content = qs('winner-content');
+  if (content) {
+    content.innerHTML = html || '<p class="hint">暂无赢家数据。</p>';
+  }
 }
+
+/* ============================================================
+   导航
+   ============================================================ */
 
 async function updateNav() {
   const session = await getSession();
-  const navLogin = document.getElementById('nav-login');
-  const navAdmin = document.getElementById('nav-admin');
-  const navLogout = document.getElementById('nav-logout');
+  const navLogin = qs('nav-login');
+  const navAdmin = qs('nav-admin');
+  const navLogout = qs('nav-logout');
+  if (!navLogin || !navAdmin || !navLogout) return;
 
   if (session) {
     const { data } = await supabase.rpc('is_admin');
@@ -210,7 +244,7 @@ async function updateNav() {
       navAdmin.style.display = '';
       navLogout.style.display = '';
     } else {
-      // 非管理员登录状态：直接退出
+      // 非管理员登录状态：静默退出
       await supabase.auth.signOut();
       navLogin.style.display = '';
       navAdmin.style.display = 'none';
@@ -223,22 +257,36 @@ async function updateNav() {
   }
 }
 
-function bindEvents() {
-  document.getElementById('nav-logout')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    signOut();
-  });
-}
+/* ============================================================
+   轮询 / 启动
+   ============================================================ */
 
 function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(loadPublicHome, 5000);
+  pollTimer = setInterval(loadPublicHome, POLL_INTERVAL);
+}
+
+// 页面不可见时暂停轮询
+function bindVisibilityChange() {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    } else {
+      loadPublicHome();
+      startPolling();
+    }
+  });
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  bindEvents();
-  await initVisibility();   // 新增
+  qs('nav-logout')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    signOut();
+  });
+
+  await initVisibility();
   await updateNav();
   await loadPublicHome();
   startPolling();
+  bindVisibilityChange();
 });

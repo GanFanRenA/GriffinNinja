@@ -1970,7 +1970,10 @@ label.radio input {
   background: var(--bg);
   margin-bottom: var(--sp-3);
 }
-.setting-group:last-child { margin-bottom: 0; }
+
+.setting-group:last-child {
+  margin-bottom: 0;
+}
 
 .setting-group .setting-row {
   padding: 12px 0;
@@ -1997,6 +2000,7 @@ label.radio input {
   padding: 8px 0;
   border-bottom: none;
 }
+
 .setting-children .setting-row:last-child {
   padding-bottom: 0;
 }
@@ -2099,4 +2103,113 @@ label.radio input {
 .photo-hint {
   font-size: 12px;
   color: var(--text-tertiary);
+}
+
+/* ============================================================
+   移动端「更多」抽屉
+   ============================================================ */
+.more-drawer {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.more-drawer.is-open {
+  display: block;
+}
+
+.more-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  animation: fade-in 0.15s ease;
+}
+
+.more-drawer-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border-strong);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  padding: var(--sp-3) var(--sp-4) calc(var(--sp-5) + env(safe-area-inset-bottom));
+  box-shadow: var(--shadow-lg);
+  animation: drawer-up 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+@keyframes drawer-up {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+.more-drawer-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: var(--r-full);
+  background: var(--border-strong);
+  margin: 0 auto var(--sp-4);
+}
+
+.more-drawer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-3);
+}
+
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  background: var(--elevated);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  text-align: left;
+}
+
+.more-item:hover {
+  color: var(--text);
+  border-color: var(--text-tertiary);
+}
+
+.more-item.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: rgba(79, 140, 255, 0.5);
+}
+
+.more-item .nav-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  stroke-width: 2;
+}
+
+/* 桌面端始终隐藏抽屉 */
+@media (min-width: 901px) {
+  .more-drawer {
+    display: none !important;
+  }
+}
+
+/* 底部导航激活态：更多按钮 */
+.bottom-nav .nav-item.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 600;
 }

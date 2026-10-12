@@ -46,6 +46,9 @@ const TAB_TITLES = {
     settings: '设置',
 };
 
+// 收纳在「更多」抽屉中的 Tab
+const MORE_TABS = ['colleges', 'rules', 'admins', 'settings'];
+
 let currentTab = 'overview';
 
 /* ============================================================
@@ -53,29 +56,30 @@ let currentTab = 'overview';
    ============================================================ */
 
 export function goto(tab) {
-  if (!TAB_TITLES[tab]) return;
-  currentTab = tab;
-
-  // 切换 Tab 时关闭所有打开的 Modal，恢复页面滚动
-  document.querySelectorAll('.modal-overlay').forEach(m => {
-    m.style.display = 'none';
-  });
-  document.body.style.overflow = '';
-
-  qsa('[data-nav]').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.nav === tab);
-  });
-
-  qsa('[data-panel]').forEach(p => {
-    p.classList.toggle('active', p.dataset.panel === tab);
-  });
-
-  const titleEl = qs('topbar-title');
-  if (titleEl) titleEl.textContent = TAB_TITLES[tab];
-
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-
-  refreshTab(tab);
+    if (!TAB_TITLES[tab]) return;
+    currentTab = tab;
+    // 切换 Tab 时关闭所有打开的 Modal，恢复页面滚动
+    document.querySelectorAll('.modal-overlay').forEach(m => {
+        m.style.display = 'none';
+    });
+    document.body.style.overflow = '';
+    // 关闭「更多」抽屉
+    closeMoreDrawer();
+    qsa('[data-nav]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.nav === tab);
+    });
+    // 「更多」按钮：当前 Tab 属于抽屉时高亮
+    const moreToggle = document.querySelector('[data-more-toggle]');
+    if (moreToggle) {
+        moreToggle.classList.toggle('active', MORE_TABS.includes(tab));
+    }
+    const titleEl = qs('topbar-title');
+    if (titleEl) titleEl.textContent = TAB_TITLES[tab];
+    window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+    refreshTab(tab);
 }
 
 export function refreshTab(tab = currentTab) {
@@ -342,81 +346,81 @@ function fillEventForm() {
    ============================================================ */
 
 async function handleStart(btn) {
-  const isRestart = state.event?.status === 'ended';
+    const isRestart = state.event?.status === 'ended';
 
-  const message = isRestart
-    ? '将开始一轮全新活动：<br>' +
-      '· 所有参与者重置为「存活」<br>' +
-      '· 重新生成代码与击杀环（避免同 House 互为目标）<br>' +
-      '<strong style="color:#fca5a5">· 清空所有击杀记录</strong><br>' +
-      '<strong style="color:#fca5a5">· 学院分数归零</strong><br>' +
-      '此操作不可撤销。'
-    : '将开始活动：<br>' +
-      '· 所有参与者重置为「存活」<br>' +
-      '· 生成新代码与击杀环（避免同 House 互为目标）<br>' +
-      '· 学院分数归零';
+    const message = isRestart
+        ? '将开始一轮全新活动：<br>' +
+        '· 所有参与者重置为「存活」<br>' +
+        '· 重新生成代码与击杀环（避免同 House 互为目标）<br>' +
+        '<strong style="color:#fca5a5">· 清空所有击杀记录</strong><br>' +
+        '<strong style="color:#fca5a5">· 学院分数归零</strong><br>' +
+        '此操作不可撤销。'
+        : '将开始活动：<br>' +
+        '· 所有参与者重置为「存活」<br>' +
+        '· 生成新代码与击杀环（避免同 House 互为目标）<br>' +
+        '· 学院分数归零';
 
-  const label = isRestart ? '开始新活动' : '开始活动';
+    const label = isRestart ? '开始新活动' : '开始活动';
 
-  const ok = await confirmDialog({
-    title: label,
-    message,
-    confirmText: label,
-    danger: true,
-    requireInput: {
-      label: `请输入「${label}」以确认`,
-      value: label,
-      placeholder: label,
-    },
-  });
-  if (!ok) return;
-
-  setLoading(btn, true, '开始中...');
-
-  // 第一次尝试：严格模式（避免同 House）
-  let { data, error } = await supabase.rpc('admin_start_event', {
-    p_strict_house: true,
-  });
-
-  // 无解 → 询问是否忽略规则
-  if (!error && data?.error === 'cannot_avoid_same_house') {
-    setLoading(btn, false);
-
-    const ignoreOk = await confirmDialog({
-      title: '无法避免同 House 互为目标',
-      message:
-        `最大的学院「<strong>${escapeHtml(data.max_house_name || '?')}</strong>」有 ` +
-        `<strong>${data.max_count}</strong> 人，总人数 <strong>${data.total}</strong> 人。<br><br>` +
-        `当一个学院的人数超过总人数一半时，环上必然会出现两个同学院的人相邻。<br>` +
-        `是否忽略这条规则，按普通随机生成？`,
-      confirmText: '忽略规则，生成环',
-      cancelText: '取消',
-      danger: false,
+    const ok = await confirmDialog({
+        title: label,
+        message,
+        confirmText: label,
+        danger: true,
+        requireInput: {
+            label: `请输入「${label}」以确认`,
+            value: label,
+            placeholder: label,
+        },
     });
-
-    if (!ignoreOk) return;
+    if (!ok) return;
 
     setLoading(btn, true, '开始中...');
-    ({ data, error } = await supabase.rpc('admin_start_event', {
-      p_strict_house: false,
-    }));
-  }
 
-  setLoading(btn, false);
+    // 第一次尝试：严格模式（避免同 House）
+    let { data, error } = await supabase.rpc('admin_start_event', {
+        p_strict_house: true,
+    });
 
-  if (error || data?.error) {
-    const errMap = {
-      not_admin: '你不是管理员',
-      no_event: '没有事件',
-      not_enough_participants: '参与者不足 2 人',
-    };
-    showToast('开始失败：' + (errMap[data?.error] || error?.message || data?.error), 'error');
-    return;
-  }
+    // 无解 → 询问是否忽略规则
+    if (!error && data?.error === 'cannot_avoid_same_house') {
+        setLoading(btn, false);
 
-  const suffix = data?.strict_house ? '（已避免同 House）' : '（未启用同 House 规则）';
-  showToast(`活动已开始，共 ${data?.count ?? '?'} 人${suffix}`, 'success');
-  loadOverview();
+        const ignoreOk = await confirmDialog({
+            title: '无法避免同 House 互为目标',
+            message:
+                `最大的学院「<strong>${escapeHtml(data.max_house_name || '?')}</strong>」有 ` +
+                `<strong>${data.max_count}</strong> 人，总人数 <strong>${data.total}</strong> 人。<br><br>` +
+                `当一个学院的人数超过总人数一半时，环上必然会出现两个同学院的人相邻。<br>` +
+                `是否忽略这条规则，按普通随机生成？`,
+            confirmText: '忽略规则，生成环',
+            cancelText: '取消',
+            danger: false,
+        });
+
+        if (!ignoreOk) return;
+
+        setLoading(btn, true, '开始中...');
+        ({ data, error } = await supabase.rpc('admin_start_event', {
+            p_strict_house: false,
+        }));
+    }
+
+    setLoading(btn, false);
+
+    if (error || data?.error) {
+        const errMap = {
+            not_admin: '你不是管理员',
+            no_event: '没有事件',
+            not_enough_participants: '参与者不足 2 人',
+        };
+        showToast('开始失败：' + (errMap[data?.error] || error?.message || data?.error), 'error');
+        return;
+    }
+
+    const suffix = data?.strict_house ? '（已避免同 House）' : '（未启用同 House 规则）';
+    showToast(`活动已开始，共 ${data?.count ?? '?'} 人${suffix}`, 'success');
+    loadOverview();
 }
 
 async function handleReshuffle(btn) {
@@ -606,6 +610,9 @@ async function boot() {
     // 全局委托
     bindGlobalDelegation();
 
+    // 移动端「更多」抽屉
+    initMoreDrawer();
+
     // 初始化各 Tab 模块（只绑定一次事件）
     initParticipants();
     initChain();
@@ -617,6 +624,44 @@ async function boot() {
 
     // 首次渲染
     goto('overview');
+}
+
+/* ============================================================
+   移动端「更多」抽屉
+   ============================================================ */
+function closeMoreDrawer() {
+    const drawer = qs('more-drawer');
+    if (!drawer) return;
+    drawer.classList.remove('is-open');
+    drawer.setAttribute('aria-hidden', 'true');
+}
+
+function openMoreDrawer() {
+    const drawer = qs('more-drawer');
+    if (!drawer) return;
+    drawer.classList.add('is-open');
+    drawer.setAttribute('aria-hidden', 'false');
+}
+
+function initMoreDrawer() {
+    const drawer = qs('more-drawer');
+    if (!drawer || drawer.dataset.bound === '1') return;
+    drawer.dataset.bound = '1';
+    const toggle = document.querySelector('[data-more-toggle]');
+    toggle?.addEventListener('click', () => {
+        if (drawer.classList.contains('is-open')) closeMoreDrawer();
+        else openMoreDrawer();
+    });
+    // 点击遮罩关闭
+    drawer.querySelectorAll('[data-more-close]').forEach(el => {
+        el.addEventListener('click', closeMoreDrawer);
+    });
+    // Esc 关闭
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && drawer.classList.contains('is-open')) {
+            closeMoreDrawer();
+        }
+    });
 }
 
 document.addEventListener('DOMContentLoaded', boot);

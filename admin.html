@@ -242,7 +242,7 @@
                             </div>
                         </div>
 
-                                                <div class="field">
+                        <div class="field">
                             <label>照片</label>
                             <div class="photo-uploader" data-photo-uploader="p-photo">
                                 <div class="photo-preview">
@@ -250,12 +250,15 @@
                                 </div>
                                 <div class="photo-meta">
                                     <div class="photo-actions">
-                                        <button type="button" class="btn btn-secondary btn-sm" data-photo-choose>选择照片</button>
-                                        <button type="button" class="btn btn-ghost btn-sm" data-photo-remove style="display:none">移除</button>
+                                        <button type="button" class="btn btn-secondary btn-sm"
+                                            data-photo-choose>选择照片</button>
+                                        <button type="button" class="btn btn-ghost btn-sm" data-photo-remove
+                                            style="display:none">移除</button>
                                     </div>
                                     <div class="hint photo-hint">PNG / JPG / WebP，最大 100kb</div>
                                 </div>
-                                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden data-photo-file>
+                                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden
+                                    data-photo-file>
                                 <input type="hidden" id="p-photo" data-photo-value value="">
                             </div>
                         </div>
@@ -413,15 +416,16 @@
                     </div>
                 </section>
 
-                                <!-- ==================== 全局链 ==================== -->
+                <!-- ==================== 全局链 ==================== -->
                 <section class="tab-panel" data-panel="chain">
                     <!-- 复活 -->
                     <div class="card collapsible" data-collapse-key="chain-reinsert">
                         <div class="card-head collapsible-head" data-collapse-trigger>
                             <h2>重新加入已淘汰者</h2>
                             <span class="collapse-chevron" aria-hidden="true">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M6 9l6 6 6-6"/>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M6 9l6 6 6-6" />
                                 </svg>
                             </span>
                         </div>
@@ -436,8 +440,10 @@
                             </div>
                             <div id="reinsert-search-results"></div>
 
-                            <div id="reinsert-selected" style="display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
-                                <p class="hint" style="margin-bottom:8px">已选择：<strong id="reinsert-selected-name">-</strong></p>
+                            <div id="reinsert-selected"
+                                style="display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+                                <p class="hint" style="margin-bottom:8px">已选择：<strong
+                                        id="reinsert-selected-name">-</strong></p>
                                 <div class="field">
                                     <label for="reinsert-hunter-select">插入位置（Hunter → 原目标）</label>
                                     <select id="reinsert-hunter-select"></select>
@@ -457,8 +463,9 @@
                             <div class="row" style="gap:6px;align-items:center">
                                 <button class="btn btn-ghost btn-sm" id="btn-refresh-chain" data-no-collapse>刷新</button>
                                 <span class="collapse-chevron" aria-hidden="true">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M6 9l6 6 6-6"/>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M6 9l6 6 6-6" />
                                     </svg>
                                 </span>
                             </div>
@@ -475,9 +482,18 @@
                             </div>
 
                             <div id="chain-list">
-                                <div class="skeleton-row"><div class="skeleton w-40"></div><div class="skeleton w-40"></div></div>
-                                <div class="skeleton-row"><div class="skeleton w-40"></div><div class="skeleton w-40"></div></div>
-                                <div class="skeleton-row"><div class="skeleton w-40"></div><div class="skeleton w-40"></div></div>
+                                <div class="skeleton-row">
+                                    <div class="skeleton w-40"></div>
+                                    <div class="skeleton w-40"></div>
+                                </div>
+                                <div class="skeleton-row">
+                                    <div class="skeleton w-40"></div>
+                                    <div class="skeleton w-40"></div>
+                                </div>
+                                <div class="skeleton-row">
+                                    <div class="skeleton w-40"></div>
+                                    <div class="skeleton w-40"></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -589,6 +605,7 @@
         </div>
 
         <!-- ==================== 移动端底部导航 ==================== -->
+        <!-- ==================== 移动端底部导航 ==================== -->
         <nav class="bottom-nav" id="bottom-nav">
             <button class="nav-item active" data-nav="overview">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -622,16 +639,56 @@
                 </svg>
                 <span>记录</span>
             </button>
-            <button class="nav-item" data-nav="settings">
+            <button class="nav-item" data-more-toggle>
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <circle cx="12" cy="12" r="3" />
-                    <path
-                        d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H2.8a2 2 0 1 1 0-4h.2A1.7 1.7 0 0 0 4.5 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V2.8a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z" />
+                    <circle cx="5" cy="12" r="1.8" fill="currentColor" stroke="none" />
+                    <circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none" />
+                    <circle cx="19" cy="12" r="1.8" fill="currentColor" stroke="none" />
                 </svg>
-                <span>设置</span>
+                <span>更多</span>
             </button>
         </nav>
 
+    </div>
+
+    <!-- ==================== 移动端「更多」抽屉 ==================== -->
+    <div class="more-drawer" id="more-drawer" aria-hidden="true">
+        <div class="more-drawer-backdrop" data-more-close></div>
+        <div class="more-drawer-panel" role="menu">
+            <div class="more-drawer-handle"></div>
+            <div class="more-drawer-grid">
+                <button class="more-item" data-nav="colleges" role="menuitem">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M3 10l9-6 9 6" />
+                        <path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9" />
+                        <path d="M9 20v-6h6v6" />
+                    </svg>
+                    <span>学院</span>
+                </button>
+                <button class="more-item" data-nav="rules" role="menuitem">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M5 4h11l3 3v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
+                        <path d="M8 9h8M8 13h8M8 17h5" />
+                    </svg>
+                    <span>每日规则</span>
+                </button>
+                <button class="more-item" data-nav="admins" role="menuitem">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M12 3l8 3v5c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-3z" />
+                        <path d="M9.5 12l2 2 3.5-4" />
+                    </svg>
+                    <span>管理员</span>
+                </button>
+                <button class="more-item" data-nav="settings" role="menuitem">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                            d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H2.8a2 2 0 1 1 0-4h.2A1.7 1.7 0 0 0 4.5 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V2.8a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z" />
+                    </svg>
+                    <span>设置</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- ==================== Modal：编辑参与者 ==================== -->
@@ -670,7 +727,7 @@
                 </div>
             </div>
 
-                        <div class="field">
+            <div class="field">
                 <label>照片</label>
                 <div class="photo-uploader" data-photo-uploader="edit-p-photo">
                     <div class="photo-preview">
@@ -679,7 +736,8 @@
                     <div class="photo-meta">
                         <div class="photo-actions">
                             <button type="button" class="btn btn-secondary btn-sm" data-photo-choose>选择照片</button>
-                            <button type="button" class="btn btn-ghost btn-sm" data-photo-remove style="display:none">移除</button>
+                            <button type="button" class="btn btn-ghost btn-sm" data-photo-remove
+                                style="display:none">移除</button>
                         </div>
                         <div class="hint photo-hint">PNG / JPG / WebP，最大 2MB</div>
                     </div>

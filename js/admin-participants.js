@@ -1,5 +1,5 @@
 // js/admin-participants.js
-// 参与者：列表 / 筛选 / 批量 / CSV 导入预览 / 增删改 / 照片上传
+// 参与者：列表 / 筛选 / 排序 / 批量 / CSV 导入预览 / 增删改 / 照片上传
 
 import { supabase } from './supabase.js';
 import { state, refreshTab } from './admin.js';
@@ -16,6 +16,7 @@ let filter = {
   collegeId: '',
   status: '',
   grade: '',
+  sort: 'created_desc',
 };
 
 let selectedIds = new Set();
@@ -27,14 +28,14 @@ let lastRenderedSignature = '';
    照片上传器
    ============================================================ */
 
-const uploaders = new Map(); // key -> { getValue, setValue, reset }
+const uploaders = new Map();
 
 async function uploadImage(file) {
   if (!file) throw new Error('未选择文件');
   if (!file.type.startsWith('image/')) throw new Error('请选择图片文件');
 
-  const MAX = 100 * 1024;
-  if (file.size > MAX) throw new Error('文件不能超过 100KB');
+  const MAX = 2 * 1024 * 1024;
+  if (file.size > MAX) throw new Error('文件不能超过 2MB');
 
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const uuid = (crypto.randomUUID
@@ -126,10 +127,8 @@ function initAllUploaders() {
    ============================================================ */
 
 export function initParticipants() {
-  // 照片上传器
   initAllUploaders();
 
-  // 添加
   qs('btn-add-participant')?.addEventListener('click', (e) => addParticipant(e.currentTarget));
 
   // 筛选
@@ -152,7 +151,17 @@ export function initParticipants() {
     render();
   });
 
-  // 批量操作条
+  // 排序
+  const sortEl = qs('p-sort');
+  if (sortEl) {
+    sortEl.value = filter.sort;
+    sortEl.addEventListener('change', (e) => {
+      filter.sort = e.target.value || 'created_desc';
+      render();
+    });
+  }
+
+  // 批量操作
   qs('p-bulk-clear')?.addEventListener('click', () => {
     selectedIds.clear();
     render();
@@ -165,7 +174,7 @@ export function initParticipants() {
   qs('btn-save-edit-participant')?.addEventListener('click', (e) => saveEditParticipant(e.currentTarget));
   qs('btn-cancel-edit-participant')?.addEventListener('click', closeEditModal);
 
-  // CSV 导入 Modal
+  // CSV 导入
   qs('btn-open-import')?.addEventListener('click', openImportModal);
   qs('btn-cancel-import')?.addEventListener('click', closeImportModal);
   qs('btn-preview-import')?.addEventListener('click', previewImport);
@@ -243,11 +252,83 @@ function getFiltered() {
   });
 }
 
+/* ============================================================
+   排序
+   - created_asc / created_desc ：按 created_at
+   - name_asc / name_desc      ：按完整 name
+   - surname_asc / surname_desc：取第一个空格后的字符串作为「姓」
+                                 无空格的（比如纯中文名）视为无姓，始终排最前
+   ============================================================ */
+function cmpCreated(dir) {
+  return (a, b) => {
+    const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return dir === 'asc' ? ta - tb : tb - ta;
+  };
+}
+
+function cmpName(dir) {
+  return (a, b) => {
+    const c = String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base' });
+    return dir === 'asc' ? c : -c;
+  };
+}
+
+// 姓氏排序 key：把「名 姓」格式的姓名重组成「姓 名」再比较。
+// 例：John Smith  →  "Smith John"
+//     Alice Brown →  "Brown Alice"
+//     张三（无空格）→  null，排最前
+function getSurnameKey(name) {
+  if (!name) return null;
+  const s = String(name).trim();
+  const idx = s.indexOf(' ');
+  if (idx < 0) return null;
+
+  const firstName = s.slice(0, idx).trim();
+  const surname = s.slice(idx + 1).trim();
+  if (!surname) return null;
+
+  return firstName ? `${surname} ${firstName}` : surname;
+}
+
+function cmpSurname(dir) {
+  return (a, b) => {
+    const ka = getSurnameKey(a.name);
+    const kb = getSurnameKey(b.name);
+
+    // 无姓者（纯中文名 / 无空格）始终排最前
+    if (!ka && !kb) return 0;
+    if (!ka) return -1;
+    if (!kb) return 1;
+
+    const c = ka.localeCompare(kb, 'en', { sensitivity: 'base' });
+    return dir === 'asc' ? c : -c;
+  };
+}
+
+function getSorted(list) {
+  const arr = list.slice();
+  switch (filter.sort) {
+    case 'created_asc':  return arr.sort(cmpCreated('asc'));
+    case 'created_desc': return arr.sort(cmpCreated('desc'));
+    case 'name_asc':     return arr.sort(cmpName('asc'));
+    case 'name_desc':    return arr.sort(cmpName('desc'));
+    case 'surname_asc':  return arr.sort(cmpSurname('asc'));
+    case 'surname_desc': return arr.sort(cmpSurname('desc'));
+    default:             return arr;
+  }
+}
+
+/* ============================================================
+   渲染
+   ============================================================ */
+
 function render() {
   const el = qs('participants-list');
   if (!el) return;
 
-  const list = getFiltered();
+  const list = getSorted(getFiltered());
+
   const countHint = qs('p-count-hint');
   if (countHint) {
     const total = state.participants.length;
@@ -355,7 +436,7 @@ function bindTableEvents() {
       Array.from(rowChecks).some(cb => cb.checked);
 
     selectAll.addEventListener('change', () => {
-      const list = getFiltered();
+      const list = getSorted(getFiltered());
       if (selectAll.checked) list.forEach(p => selectedIds.add(p.id));
       else list.forEach(p => selectedIds.delete(p.id));
       render();

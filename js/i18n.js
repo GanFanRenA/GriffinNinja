@@ -61,7 +61,7 @@ const messages = {
         'header.admin': '后台',
         'header.logout': '退出',
         'header.logoutFull': '退出登录',
-        'header.viewHome': '查看首页 ↗',
+        'header.viewHome': '查看首页',
 
         // ===== Language =====
         'lang.zh': '中',
@@ -713,7 +713,7 @@ const messages = {
         'header.admin': 'Admin',
         'header.logout': 'Log out',
         'header.logoutFull': 'Sign out',
-        'header.viewHome': 'View site ↗',
+        'header.viewHome': 'View site',
 
         // ===== Language =====
         'lang.zh': '中',

@@ -1,547 +1,379 @@
-================================================================
-NinjaTag 项目功能文档（截至 2026-10-11）
-================================================================
+# NinjaTag 功能清单
 
-本文件记录当前版本已实现的功能、数据表结构、表关系、
-RPC 函数清单，以及角色与权限划分。
+最后更新：2026-10-12
 
-================================================================
-一、已实现的功能
-================================================================
+本文档汇总当前版本已实现的全部功能。
 
-【1. 登录与账号】
-- 仅管理员可登录，参与者登录入口已关闭。
-- 登录方式：
-  - 学校邮箱 Magic Link（默认）
-  - 测试用密码登录（保留用于开发调试）
-- 登录后路由：
-  - 管理员 → admin.html
-  - 非管理员 → 提示"仅管理员可以登录"后强制退出到首页
-- 学校邮箱域名限制：@bjsmicschool.com
+---
 
-【2. 公共主页（index.html）】
-- 匿名可访问，展示：
-  - 活动状态、当前天数
-  - 阵营分数
-  - 存活 / 淘汰人数
-  - 今日规则
-  - 存活墙
-  - 最终赢家
-- 数据每 5 秒轮询一次。
-- 存活墙做了数据指纹，避免重复渲染。
+## 一、账号系统
 
-【3. 首页板块可见性开关】
-- 管理员登录首页时，每个板块标题右侧出现「公开可见」开关。
-- 可控制板块是否对非管理员可见。
-- 板块列表：
-  - event      活动状态
-  - colleges   阵营分数
-  - counts     人数
-  - today_rule 今日规则
-  - alive_wall 存活墙
-  - winner     最终赢家
-- 非管理员访问时按配置隐藏板块。
+### 【1.1 注册】
+- 页面：`register.html`
+- 输入学校邮箱（`@bjsmicschool.com`），发送注册邮件（Magic Link）
+- 邮件中的链接指向 `set-password.html`
 
-【4. 管理后台（admin.html）】
-包含 Tab：
-- 事件
-- 学院
-- 参与者
-- 每日规则
-- 全局链
-- 击杀记录
-- 历史记录
-- 管理员
+### 【1.2 设置密码】
+- 页面：`set-password.html`
+- 从邮件链接进入后，Supabase 自动解析 token
+- 输入新密码（≥ 6 位）+ 确认密码
+- 保存后自动跳转到后台
 
-已隐藏 Tab（入口关闭，代码保留）：
-- 举报
+### 【1.3 登录】
+- 页面：`login.html`
+- 输入邮箱（或姓名）+ 密码
+- 支持"邮箱登录"和"姓名登录"两种方式
+  （姓名登录需后端 RPC `resolve_login_email`）
+- 非管理员登录会被强制登出并跳回首页
 
-【5. 事件管理】
-- 开始活动：重置所有参与者为 alive、生成新代码、随机生成环、学院分归零
+### 【1.4 退出】
+- 所有已登录页面顶部/侧边栏有"退出"入口
+
+---
+
+## 二、公共主页（`index.html`）
+
+### 【2.1 板块】
+- 活动状态（未开始 / 进行中 / 已暂停 / 已结束）
+- 当前天数（仅进行中显示）
+- 阵营分数
+- 存活 / 淘汰人数（赢家计入存活）
+- 今日规则
+- 存活墙（含赢家）
+- 最终赢家（活动结束后显示）
+
+### 【2.2 数据刷新】
+- 每 5 秒轮询一次
+- 页面隐藏时暂停轮询
+- 存活墙做数据指纹，避免重复渲染
+
+### 【2.3 可见性】
+- 由后台"设置"控制每个板块对匿名访客是否可见
+- 管理员登录后始终可见全部板块
+
+---
+
+## 三、管理后台（`admin.html`）
+
+### 【3.1 布局】
+- 桌面端：左侧固定侧边栏 + 右侧内容区
+- 移动端：顶部标题 + 底部固定导航
+- 侧边栏导航项：
+  概览 / 参与者 / 学院 / 每日规则 / 全局链 / 记录 / 管理员 / 设置
+- 移动端底部导航只保留 5 个高频项
+- 顶栏右侧提供语言切换器
+- 顶栏"查看首页"为同标签跳转（不打开新窗口）
+
+### 【3.2 概览页】
+- 状态英雄卡：显示活动状态、名称、存活/淘汰人数、当前天数
+- 根据状态动态显示操作按钮：
+  - 未开始：[开始活动] [重新打乱]
+  - 进行中：[暂停活动] [重新打乱] [结束活动]
+  - 已暂停：[继续活动] [重新打乱] [结束活动]
+  - 已结束：[开始新活动] [查看记录]
+- 下一步建议条（动态提示，如"今日规则未发布"）
+- 阵营分数卡片
+- 今日规则摘要
+- 最近 5 条动态（击杀/撤销/复活）
+- 事件配置（名称、当前天数）
+
+### 【3.3 事件操作】
+- 开始活动：重置所有参与者、生成新代码、生成击杀环、学院分归零
+- 开始新活动：活动结束后同一入口，文案区分
 - 重新打乱存活者：只对存活者重新生成环
 - 暂停 / 继续
-- 结束活动（需输入"结束活动"确认）
+- 结束活动：需输入「结束活动」确认
 - 修改事件名称与当前天数
 
-【6. 学院管理】
-- 编辑学院名称与颜色
-- 单个学院手动 +1 / -1 分
-- 展示每个学院的人数
-
-【7. 参与者管理】
+### 【3.4 参与者管理】
 - 添加单个参与者
-  - 必填：name
-  - 可选：grade、house（college）、photo_url、email
-  - 邮箱若填写，需为学校邮箱且唯一
+  - 姓名（必填）
+  - 年级（下拉：G9 / G10 / G11 / G12 / Teacher）
+  - House / 学院（下拉）
+  - 邮箱（学校邮箱校验 + 唯一性）
+  - 照片（URL 输入）
 - CSV 批量导入
-  - 列顺序：name, grade, house, photo_url, email
-  - 姓名为空的行跳过
-  - 邮箱重复的行跳过
-- 编辑参与者
-  - 可修改：name、grade、house、photo_url、email
-  - 邮箱仍需校验域名与唯一性
-- 删除参与者
-  - 同步清理其击杀记录、举报、相关引用
-- 搜索：按姓名 / 邮箱 / grade 过滤
+  - 列顺序：`name, grade, house, photo_url, email`
+  - 支持双引号包裹、引号内逗号、`""` 转义
+  - 支持预览：表格展示解析结果，重复邮箱/非法年级标红
+  - 自动跳过表头、空姓名行
+- 编辑参与者（Modal）
+  - 可修改姓名、年级、House、邮箱、照片
+- 删除参与者（单条 + 批量）
+  - 同步清理击杀记录、举报、相关引用
+- 筛选
+  - 关键字搜索（姓名/邮箱/代码/年级）
+  - 学院筛选
+  - 状态筛选（存活/已淘汰/赢家）
+  - 年级筛选
+- 批量操作
+  - 表头全选 / 单行勾选
+  - 批量分 House
+  - 批量改年级
+  - 批量删除
 
-【8. Grade 枚举】
-固定为：G9、G10、G11、G12、Teacher
-- 单个添加：下拉选择
-- CSV 导入：文本，非法值视为空
-- 数据库可选加 CHECK 约束兜底
+### 【3.5 学院管理】
+- 列表展示：色点 + 名称 + 分数 + 人数
+- 行内操作：编辑 / +1 / -1
+- 编辑 Modal：名称 + 颜色选择器
+- 重置所有学院分数（危险操作，需确认）
 
-【9. 每日规则】
-- 按 Day 1-5 发布
-- 标题 + 内容
-- 已发布规则可编辑
+### 【3.6 每日规则】
+- 发布 / 编辑
+  - 天数（Day 1-5）
+  - 标题
+  - 内容
+- 已发布列表按 Day 升序排列
+- 点击编辑回填表单
 
-【10. 全局链】
-- 展示所有参与者的代码、目标、目标代码、状态
-- 搜索：姓名 / 代码 / 目标姓名 / 目标代码
-- 对存活且有目标的参与者提供「完成击杀」按钮
+### 【3.7 全局链】
+- 两个可折叠卡片：
+  - 重新加入已淘汰者
+  - 全局链（主卡片）
+- 折叠状态保存在 `localStorage`
+- 全局链表：
+  - Hunter / 代码 / 目标 / 目标代码 / 状态
+  - 搜索（姓名/代码/目标名/目标代码/学院）
+  - 状态筛选
+  - 存活且有目标的行显示"完成击杀"按钮
+  - 活动未进行时按钮禁用
 
-【11. 击杀原因细化】
-点击「完成击杀」后弹出原因选择 Modal：
-- 正常击杀        → 得分
-- 违反规则        → 得分
-- 未完成任务      → 得分
-- 缺勤            → 得分
-- 不计分击杀      → 不得分
+### 【3.8 击杀流程】
+- 点击"完成击杀" → Modal
+- 5 种击杀原因：
+  - 正常击杀（得分）
+  - 违反规则（得分）
+  - 未完成任务（得分）
+  - 缺勤（得分）
+  - 不计分击杀（不得分）
+- 选择原因后实时显示"将给 XX 学院 +1 分"
+- 确认后执行击杀：
+  - 目标标记 eliminated
+  - 猎人继承目标
+  - 学院 +1（若计分）
+  - 写 `eliminations` 记录
+  - 判断胜利
+- 剩 2 人击杀时：
+  - 猎人 → winner
+  - 事件 → ended
+  - 显示"XX 获胜，活动已结束"
 
-选择后弹出二次确认：
-「确定"目标名"因为"原因"而被击杀，"HunterHouse"将（不）得分。」
+### 【3.9 重新加入已淘汰者】
+- 搜索已淘汰者（防抖 250ms）
+- 选择插入位置（存活且有目标的 Hunter）
+- 语义：Hunter → 新加入者 → 原目标
+- 效果：恢复 alive、清空淘汰信息、生成新代码、
+  继承 Hunter 原目标、Hunter 目标指向新加入者
 
-确认后调 admin_kill_target 执行击杀：
-- 目标标记 eliminated
-- 猎人继承目标
-- 若原因计分，猎人学院 +1
-- 写 eliminations（含 reason）
-- 写审计日志
-- 判断胜利
-
-【12. 重新加入已淘汰者】
-- 在全局链 Tab 下方：
-  - 搜索已淘汰者（姓名 / 邮箱）
-  - 选择要插入的位置：Hunter 名 → 目标名
-  - 语义：Hunter → 新加入者 → 原目标
-- 重新加入后：
-  - 状态恢复为 alive
-  - 清空 eliminated_by_id / eliminated_at
-  - 生成新的 6 位唯一代码
-  - current_target_id 设为 Hunter 的原目标
-  - Hunter 的 current_target_id 设为新加入者
-
-【13. 击杀记录】
-- 展示所有击杀：猎人 → 目标、双方学院、时间、状态
-- 可撤销最近的有效击杀：
+### 【3.10 记录】
+- 击杀记录表：
+  - 猎人 → 目标、原因、学院、时间、状态
+  - 有效击杀可"撤销"
+- 撤销击杀：
   - 恢复被淘汰者
   - 恢复猎人目标
-  - 按 points_awarded 扣学院分
-  - 标记 status = revoked
-
-【14. 历史记录】
-- 合并三类事件，按时间倒序：
+  - 扣回学院分
+  - 记录撤销原因
+- 历史记录（合并三类）：
   - 击杀（valid eliminations）
   - 撤销（revoked eliminations）
-  - 复活（audit_logs 中 reinsert_participant）
-- 每条记录包含：
-  - 击杀：谁杀了谁、什么时候、哪个学院得分、原因、是否管理员击杀
-  - 撤销：撤销了哪次击杀、什么时候、哪个学院减分、原因、操作者
-  - 复活：复活了谁、什么时候、插入到谁之后、操作者
-- 支持搜索：姓名、学院、原因、操作者
+  - 复活（audit_logs / reinsert 记录）
+- 历史搜索：姓名 / 学院 / 原因 / 操作者 / 类型
+- 按时间倒序，显示绝对时间 + 相对时间
 
-【15. 管理员管理】
+### 【3.11 管理员管理】
 - 查看管理员列表
 - 添加管理员（邮箱 + 姓名）
 - 移除管理员
   - 不能移除自己
   - 至少保留一名管理员
-  - 确认文案：「是否确认将'Name'的管理员职责移除？」
+  - 二次确认
 
-【16. 审计日志（后端已有，前端未接入）】
-- 记录管理员关键操作
-- 支持查看、删除单条、清空所有
+### 【3.12 设置页】
+- 首页板块可见性
+  - 平铺开关：活动状态 / 阵营分数 / 人数 / 今日规则 / 存活墙
+  - 分组开关："最终赢家"作为父项，下挂 4 个附属奖项：
+    - 个人赢家
+    - 阵营赢家
+    - 最多淘汰
+    - 最快阵亡
+  - 关闭父开关时子开关自动变灰禁用
+  - 切换即保存
 
-================================================================
-二、数据表结构
-================================================================
+---
 
-【1. colleges（学院 / 阵营）】
-- id                uuid 主键
-- name              text 唯一
-- color_hex         text 颜色
-- score             integer 学院分
-- created_at        timestamptz
-- updated_at        timestamptz
-初始数据：Red、Yellow、Blue、Green
+## 四、最终赢家（4 个奖项）
 
-【2. events（事件）】
-- id                uuid 主键
-- name              text
-- status            text  draft / active / paused / ended
-- start_at          timestamptz
-- end_at            timestamptz
-- current_day       integer 1-5
-- created_at        timestamptz
-- updated_at        timestamptz
+### 【4.1 显示条件】
+- 只在活动结束时显示
+- 总开关"最终赢家"关闭时整块隐藏
+- 每个子奖项独立开关，可单独隐藏
+- 管理员绕过所有开关，始终看到 4 个
 
-【3. participants（参与者）】
-- id                uuid 主键
-- event_id          uuid → events.id
-- email             text 可空，唯一（多个 NULL 不冲突）
-- name              text 必填
-- grade             text 可空（G9/G10/G11/G12/Teacher）
-- photo_url         text 可空
-- college_id        uuid → colleges.id，可空
-- code              text 唯一，6 位（排除 O0I1L）
-- status            text alive / eliminated / winner
-- current_target_id uuid → participants.id
-- eliminated_by_id  uuid → participants.id
-- eliminated_at     timestamptz
-- is_confirmed      boolean
-- confirmed_at      timestamptz
-- created_at        timestamptz
-- updated_at        timestamptz
-约束：
-- email 唯一（NULL 除外）
-- code 唯一
-- current_target_id <> id
+### 【4.2 奖项数据】
+- 个人赢家：`participants.status = 'winner'`
+- 阵营赢家：`colleges.score` 最高的学院
+- 最多淘汰：valid eliminations 中 hunter 击杀次数最多
+- 最快阵亡：`eliminated_at` 最早的被淘汰者
 
-【4. eliminations（击杀记录）】
-- id                 uuid 主键
-- event_id           uuid → events.id
-- hunter_id          uuid → participants.id
-- target_id          uuid → participants.id
-- hunter_college_id  uuid → colleges.id
-- target_college_id  uuid → colleges.id
-- input_code         text  'ADMIN' 表示管理员击杀
-- points_awarded     integer 1 或 0
-- reason             text 击杀原因
-                        normal / rule_violation /
-                        task_incomplete / absent / no_points
-- status             text  valid / revoked
-- created_at         timestamptz
-- revoked_at         timestamptz
-- revoked_by         uuid → admins.id
-- revoke_reason      text
+### 【4.3 缓存】
+- 按 `event.id` 缓存 `get_winner_stats` 结果
+- 活动状态变化时清空缓存
 
-【5. reports（举报）】
-- id              uuid 主键
-- event_id        uuid → events.id
-- reporter_id     uuid → participants.id
-- target_id       uuid → participants.id
-- reason          text
-- description     text
-- evidence_url    text
-- status          text  pending / resolved / rejected
-- admin_note      text
-- handled_by      uuid → admins.id
-- handled_at      timestamptz
-- created_at      timestamptz
-备注：前端入口已关闭，表和数据保留。
+---
 
-【6. daily_rules（每日规则）】
-- id              uuid 主键
-- event_id        uuid → events.id
-- day_number      integer 1-5
-- date            date
-- title           text
-- content         text
-- published       boolean
-- created_by      uuid → admins.id
-- created_at      timestamptz
-- updated_at      timestamptz
-唯一约束：event_id + day_number
+## 五、照片上传
 
-【7. admins（管理员）】
-- id              uuid 主键
-- email           text 唯一
-- name            text
-- created_at      timestamptz
-- updated_at      timestamptz
+### 【5.1 存储】
+- Supabase Storage 桶：`photos`
+- 公开可读，仅管理员可写/更新/删除
 
-【8. audit_logs（审计日志）】
-- id              uuid 主键
-- event_id        uuid → events.id ON DELETE SET NULL
-- admin_id        uuid → admins.id ON DELETE SET NULL
-- admin_email     text
-- action          text NOT NULL
-- details         jsonb DEFAULT '{}'::jsonb
-- created_at      timestamptz DEFAULT now()
-索引：event_id、created_at DESC
+### 【5.2 当前实现】
+- 添加参与者与编辑参与者均提供"照片 URL"输入框
+- 照片实际文件上传组件尚未实现（待接入）
 
-【9. home_sections（首页板块可见性）】
-- key                text 主键
-- label              text
-- visible_to_public  boolean DEFAULT true
-- sort_order         integer
-- updated_at         timestamptz
-初始数据：
-- event      活动状态
-- colleges   阵营分数
-- counts     人数
-- today_rule 今日规则
-- alive_wall 存活墙
-- winner     最终赢家
+---
 
-================================================================
-三、表的关系
-================================================================
+## 六、权限与安全
 
-- colleges 1:N participants          （一个学院多个参与者）
-- colleges 1:N eliminations          （hunter_college_id / target_college_id）
-- events    1:N participants
-- events    1:N eliminations
-- events    1:N reports
-- events    1:N daily_rules
-- events    1:N audit_logs
+### 【6.1 角色】
+- 匿名访客：仅公共主页
+- 管理员：全部后台功能
 
-- participants 自关联：
-  - current_target_id → participants.id
-  - eliminated_by_id  → participants.id
+### 【6.2 RLS】
+- 所有表启用行级安全
+- 玩家侧入口已关闭（`me.html` / `confirm.html` 硬关闭）
 
-- eliminations N:1 participants（hunter_id）
-- eliminations N:1 participants（target_id）
-- eliminations N:1 admins（revoked_by）
+### 【6.3 学校邮箱】
+- 域名限制：`@bjsmicschool.com`
+- 前端校验 + 后端 RPC `is_school_email` 双重检查
 
-- reports N:1 participants（reporter_id）
-- reports N:1 participants（target_id）
-- reports N:1 admins（handled_by）
+### 【6.4 唯一性约束】
+- `participants.email` 唯一（null 除外）
+- `participants.code` 唯一（6 位，排除 O0I1L）
+- `participants.current_target_id <> id`
 
-- daily_rules N:1 admins（created_by）
+---
 
-- audit_logs N:1 admins（admin_id）
+## 七、数据处理
 
-- home_sections 独立表，不与其它表关联
+### 【7.1 开始活动（严格模式）】
+- 默认启用"避免同 House 互为目标"
+- 贪心算法生成环顺序
+- 若最大 House 人数 > 总人数一半，返回错误
+- 前端弹窗提示，管理员可选：
+  - 取消（不改动数据）
+  - 忽略规则，用普通随机生成
 
-================================================================
-四、SQL 函数清单（RPC）
-================================================================
+### 【7.2 重新打乱存活者】
+- 不启用同 House 规则（只对存活者随机）
 
-【公共 / 通用】
-- get_public_home()
-    公共主页数据：事件、阵营分、人数、今日规则、存活墙、赢家
-- get_home_section_visibility()
-    返回 { key: visible_to_public } 映射
-- is_admin()
-    判断当前登录用户是否在 admins 表中
-- current_user_email()
-    返回当前登录用户的邮箱
-- is_school_email(p_email)
-    判断是否为学校邮箱
+### 【7.3 胜利判断】
+- 击杀前存活人数 ≤ 2 → 猎人获胜
+- 事件状态改为 `ended`
 
-【玩家侧（玩家登录已关闭，函数保留）】
-- get_my_profile()
-- confirm_identity()
-- report_identity_issue(text)
-- kill_target(uuid, text)
-- submit_report(uuid, text, text, text)
+---
 
-【事件管理】
-- admin_get_event()
-- admin_update_event(p_name, p_current_day)
-- admin_start_event()
-    重置参与者、生成代码、生成环、清空击杀记录、写审计日志
-- admin_reshuffle_alive()
-    只对存活者重新生成环
-- admin_pause_event()
-- admin_resume_event()
-- admin_end_event(p_confirm text)
+## 八、UI 与交互
 
-【学院管理】
-- admin_get_colleges()
-- admin_update_college(p_id, p_name, p_color)
-- admin_adjust_college_score(p_college_id, p_delta)
-- admin_reset_college_scores()
+### 【8.1 组件】
+- Toast 通知（成功/失败/警告/信息）
+- 通用确认对话框（支持危险操作、要求输入确认文本）
+- Modal（编辑/导入/击杀原因/批量修改/确认/编辑学院）
+- 骨架屏（列表加载占位）
+- 空状态（无数据时显示图标 + 说明 + 操作入口）
+- 可折叠卡片（全局链两个卡片）
 
-【参与者管理】
-- admin_get_participants()
-    返回 id、name、grade、email、photo_url、
-    college_id、college_name、status、code
-- admin_add_participant(p_name, p_grade, p_college_id,
-                       p_photo_url, p_email)
-- admin_update_participant(p_id, p_name, p_grade,
-                          p_college_id, p_photo_url, p_email)
-- admin_delete_participant(p_id)
-    同步清理击杀记录、举报、相关引用
-- admin_import_participants(p_rows jsonb)
-    CSV 批量导入
+### 【8.2 视觉】
+- 暗色主题，三级背景色
+- 语义色：成功绿 / 警告黄 / 危险红 / 赢家金 / 主色蓝
+- 统一圆角、间距、阴影系统
+- 表格化列表（桌面表格 / 移动卡片）
+- 按钮体系：`primary` / `secondary` / `danger` / `ghost` × `sm` / `md` / `lg`
 
-【每日规则】
-- admin_get_daily_rules()
-- admin_publish_daily_rule(p_day, p_title, p_content)
+### 【8.3 响应式】
+- ≥ 900px：侧边栏 + 主内容
+- < 900px：底部导航 + 卡片式列表
 
-【全局链与击杀】
-- admin_get_global_chain()
-    返回每位参与者的 name、code、status、
-    target_name、target_code、college_name
-- admin_kill_target(p_hunter_id uuid, p_reason text)
-    管理员击杀：
-    - reason 决定是否加分
-    - 写 eliminations（含 reason）
-    - 写审计日志
-    - 判断胜利
-- admin_revoke_kill(p_elimination_id, p_reason)
-    撤销击杀：
-    - 恢复被淘汰者
-    - 恢复猎人目标
-    - 扣学院分
-    - 标记 status = revoked
-    - 记录 revoked_at、revoked_by、revoke_reason
+---
 
-【重新加入已淘汰者】
-- admin_search_eliminated_participants(p_query text)
-    搜索已淘汰者，返回 id、name、grade、email、
-    college_name、color、eliminated_at
-- admin_reinsert_participant(p_participant_id, p_hunter_id)
-    插入到 Hunter → 原目标 之间：
-    - 恢复 alive
-    - 生成新代码
-    - 继承 Hunter 的原目标
-    - Hunter 目标指向新加入者
-    - 写审计日志
+## 九、国际化（i18n）
 
-【历史记录】
-- admin_get_history(p_limit integer)
-    合并三类事件：
-    - kill     （valid eliminations）
-    - revoke   （revoked eliminations）
-    - reinsert （audit_logs 中 reinsert_participant）
-    按时间倒序返回
+### 【9.1 支持语言】
+- 中文（`zh-CN`）— 默认
+- 英文（`en`）
 
-【首页板块可见性】
-- admin_get_home_sections()
-    管理员读取所有板块及可见性
-- admin_set_home_section_visibility(p_key, p_visible)
-    切换某板块的公开可见性
+### 【9.2 语言选择与持久化】
+- 初始化顺序：`localStorage` → 浏览器语言 → 默认中文
+- `localStorage` 键：`ninjatag_locale`
+- 切换语言同步更新 `<html lang>`
+- 页面标题、静态文本、占位符、`title`、`aria-label` 均随语言切换
 
-【管理员管理】
-- admin_get_admins()
-- admin_add_admin(p_email, p_name)
-- admin_delete_admin(p_id)
-    保护逻辑：
-    - 不能删除自己（cannot_delete_self）
-    - 至少保留一名管理员（must_keep_one_admin）
+### 【9.3 语言包结构】
+- 文件：`js/i18n.js`
+- 命名空间：
+  - `common`：通用按钮、状态、错误前缀
+  - `auth`：登录 / 注册 / 设置密码
+  - `public`：公共首页
+  - `status`：状态枚举（draft/active/paused/ended/alive/eliminated/winner）
+  - `killReason`：击杀原因
+  - `admin`：后台全部文案
 
-【举报（前端入口已关闭，函数保留）】
-- admin_get_reports()
-- admin_handle_report(p_report_id, p_status, p_note)
+### 【9.4 静态文本替换】
+- 属性驱动：
+  - `data-i18n` → `textContent`
+  - `data-i18n-html` → `innerHTML`
+  - `data-i18n-placeholder` → `placeholder`
+  - `data-i18n-title` → `title`
+  - `data-i18n-aria-label` → `aria-label`
 
-【审计日志（后端已有，前端未接入）】
-- admin_get_audit_logs()
-- admin_delete_audit_log(p_log_id)
-- admin_clear_audit_logs()
+### 【9.5 动态文本替换】
+- 所有 JS 模板字符串中的用户可见文本统一使用 `t(key)` 或 `t(key, params)`
+- 带变量使用 `{name}` 占位符，例如 `t('admin.killSuccess', { target, pts })`
+- 错误码映射改为：`错误码 → i18n key → 当前语言文案`
+- 学院名、规则内容、活动名等数据库原文不做自动翻译
 
-================================================================
-五、角色与权限划分
-================================================================
+### 【9.6 切换响应】
+- 语言切换触发 `onLocaleChange` 回调
+- 各模块清空渲染签名缓存（`chainSignature`、`lastRenderedSignature`、`eliminationsSig`、`historySig`、`lastAliveWallKey`、`winnerStatsCache`）
+- 当前页面 / 当前 Tab 自动重渲染
 
-【1. 未登录访客】
-可访问：
-- index.html（公共主页）
+### 【9.7 入口位置】
+- 公共页：顶部导航栏右侧
+- 登录 / 注册 / 设置密码：顶部导航栏右侧
+- 后台：顶栏右侧
 
-可见：
-- 活动状态、当前天数
-- 阵营分数（若开关开启）
-- 存活 / 淘汰人数（若开关开启）
-- 今日规则（若开关开启）
-- 存活墙（若开关开启）
-- 最终赢家（若开关开启）
+---
 
-不可见：
-- 任何人的目标信息、代码
-- 个人页、后台
+## 十、已关闭 / 保留的功能
 
-不可操作：
-- 击杀、举报、登录
+- 玩家登录入口（`me.html` / `confirm.html` 硬关闭）
+- 举报入口（前端 Tab 隐藏）
+- 审计日志（后端已移除）
 
-【2. 玩家（已登录且已确认）】
-状态：当前版本已关闭登录入口，此角色暂不使用。
-函数与页面保留：
-- me.html、confirm.html
-- kill_target、submit_report、get_my_profile
-- confirm_identity、report_identity_issue
+---
 
-【3. 管理员】
-可访问：
-- index.html（含板块可见性开关）
-- admin.html（全部 Tab）
+## 十一、未完成 / 待接入
 
-可操作：
-- 事件：开始 / 打乱 / 暂停 / 继续 / 结束 / 改名 / 改天数
-- 学院：编辑 / 加减分 / 重置分
-- 参与者：添加 / 导入 / 编辑 / 删除 / 搜索
-- 每日规则：发布 / 编辑
-- 全局链：搜索 / 完成击杀（含原因）/ 重新加入已淘汰者
-- 击杀记录：查看 / 撤销
-- 历史记录：查看 / 搜索
-- 首页板块可见性：切换开关
-- 管理员：查看 / 添加 / 移除
-
-不可操作：
-- 修改自己的管理员身份（不能移除自己）
-- 移除最后一名管理员
-
-【4. 系统】
-- 发送登录邮件（Magic Link）
-- 生成唯一 6 位代码（排除 O0I1L）
-- 生成随机全局单向环
-- 校验击杀代码
-- 事务更新环、状态、学院分
-- 写审计日志
-- 判断胜利：
-  - 只剩 1 人存活 → 该人获胜
-  - 猎人新目标是自己 → 猎人获胜
-
-================================================================
-六、RLS 策略概览
-================================================================
-
-- colleges：匿名可读，管理员可写
-- events：匿名可读，管理员可写
-- daily_rules：匿名只读已发布，管理员可写
-- participants：玩家只能读自己，管理员全读全写
-- admins：仅管理员可读
-- eliminations：玩家只能读自己作为猎人的记录，管理员全读全写
-- reports：玩家可 insert，管理员可读可更新，不可删除
-- audit_logs：仅管理员可读、可删除
-- home_sections：匿名可读，管理员可写
-
-================================================================
-七、Storage 策略概览
-================================================================
-
-- photos   桶：公开，玩家照片
-- evidence 桶：私有，举报证据
-
-================================================================
-八、已关闭但保留的入口
-================================================================
-
-以下功能入口已关闭，代码与数据保留，未来可按需恢复：
-
-- 玩家登录入口（login.html 仍存在，但只对管理员放行）
-- 个人页（me.html、me.js）
-- 身份确认页（confirm.html、confirm.js）
-- 举报 Tab（admin.html 中 data-tab="reports" 隐藏）
-- 编辑参与者 Modal 中的「取消」按钮（style="display:none"）
-
-================================================================
-九、未完成 / 待接入功能
-================================================================
-
-- 照片上传接入 Storage（目前仅支持 URL）
-- 举报证据上传
-- Supabase Realtime 实时更新（目前用 5 秒轮询）
-- 邮件配置（Resend SMTP）
-- PWA
-- 数据导出 CSV
+- 照片删除时同步清理 Storage 文件
+- 照片文件上传组件（当前仅支持 URL 输入）
+- CSV 导出
+- Supabase Realtime 实时更新（目前 5 秒轮询）
+- 邮件模板自定义（Resend SMTP）
+- 邮件模板多语言（按用户语言发送）
+- 数据库内容多语言（活动名 / 学院名 / 规则内容）
+- 数据看板（击杀分布、学院分曲线）
+- 活动归档 / 多事件并存
+- 批量操作改为单次 RPC（当前为 N 次循环）
+- 历史记录分页
+- 参与者排序（添加时间 / 姓名 / 姓氏）
+- 设置页"最终赢家"父子开关联动
+- 开始活动"同 House 严格模式"前端处理（当前直接调用 RPC）
+- 移动端底部导航补充 学院 / 每日规则 / 管理员 入口
+- `assets/placeholder.png` 占位图文件
 - 限流与安全加固
-- 自动备份
-- 审计日志前端接入（后端已有 RPC）
+- PWA
 
-================================================================ 十、国际化（i18n） ================================================================ - 新增 js/i18n.js：字典、t(key, params)、initI18n()、setLocale()、 applyI18n(root)、mountLanguageSwitcher(target)。 - HTML 静态文本通过 data-i18n / data-i18n-html / data-i18n-placeholder / data-i18n-title / data-i18n-aria-label 标注。 - JS 动态文本统一走 t('namespace.key', params)。 - 语言切换器挂载点： - 认证页 / 公共页：<div id="lang-switch"> 在 site-header 内 - 后台：sidebar-lang-switch（侧边栏底部） - drawer-lang-switch（移动端「更多」抽屉内） - 语言优先级：URL ?lang= > localStorage ninjatag.locale > navigator.language > 默认 zh-CN。 - 切换语言会派发 localechange 事件，各模块订阅后重绘： - public.js → loadPublicHome() - admin.js → refreshParticipantsI18n / refreshChainI18n / refreshRecordsI18n / refreshMiscI18n + 概览刷新 - 数据库内容（姓名、邮箱、学院名、活动名、规则内容）不参与 i18n。 - 首页板块开关名称通过 SECTION_LABEL_KEYS 映射到 i18n key，回退到 home_sections.label。
+---
 
-================================================================
 文档结束
-================================================================

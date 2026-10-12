@@ -242,9 +242,22 @@
                             </div>
                         </div>
 
-                        <div class="field">
-                            <label for="p-photo">照片 URL</label>
-                            <input type="text" id="p-photo" placeholder="可选">
+                                                <div class="field">
+                            <label>照片</label>
+                            <div class="photo-uploader" data-photo-uploader="p-photo">
+                                <div class="photo-preview">
+                                    <img src="assets/placeholder.png" alt="">
+                                </div>
+                                <div class="photo-meta">
+                                    <div class="photo-actions">
+                                        <button type="button" class="btn btn-secondary btn-sm" data-photo-choose>选择照片</button>
+                                        <button type="button" class="btn btn-ghost btn-sm" data-photo-remove style="display:none">移除</button>
+                                    </div>
+                                    <div class="hint photo-hint">PNG / JPG / WebP，最大 100kb</div>
+                                </div>
+                                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden data-photo-file>
+                                <input type="hidden" id="p-photo" data-photo-value value="">
+                            </div>
                         </div>
 
                         <div class="row" style="justify-content:flex-end;margin-top:12px">
@@ -649,9 +662,22 @@
                 </div>
             </div>
 
-            <div class="field">
-                <label for="edit-p-photo">照片 URL</label>
-                <input type="text" id="edit-p-photo">
+                        <div class="field">
+                <label>照片</label>
+                <div class="photo-uploader" data-photo-uploader="edit-p-photo">
+                    <div class="photo-preview">
+                        <img src="assets/placeholder.png" alt="">
+                    </div>
+                    <div class="photo-meta">
+                        <div class="photo-actions">
+                            <button type="button" class="btn btn-secondary btn-sm" data-photo-choose>选择照片</button>
+                            <button type="button" class="btn btn-ghost btn-sm" data-photo-remove style="display:none">移除</button>
+                        </div>
+                        <div class="hint photo-hint">PNG / JPG / WebP，最大 2MB</div>
+                    </div>
+                    <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden data-photo-file>
+                    <input type="hidden" id="edit-p-photo" data-photo-value value="">
+                </div>
             </div>
 
             <div class="modal-actions">

@@ -67,9 +67,17 @@ export function goto(tab) {
 
     closeMoreDrawer();
 
+    // 侧边栏 / 底部导航高亮
     qsa('[data-nav]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.nav === tab);
     });
+
+    // ✅ 关键：切换对应面板的 active 类（修复点）
+    qsa('[data-panel]').forEach(p => {
+        p.classList.toggle('active', p.dataset.panel === tab);
+    });
+
+    // 「更多」按钮：当前 Tab 属于抽屉时高亮
     const moreToggle = document.querySelector('[data-more-toggle]');
     if (moreToggle) {
         moreToggle.classList.toggle('active', MORE_TABS.includes(tab));

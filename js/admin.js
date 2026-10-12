@@ -53,23 +53,29 @@ let currentTab = 'overview';
    ============================================================ */
 
 export function goto(tab) {
-    if (!TAB_TITLES[tab]) return;
-    currentTab = tab;
+  if (!TAB_TITLES[tab]) return;
+  currentTab = tab;
 
-    qsa('[data-nav]').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.nav === tab);
-    });
+  // 切换 Tab 时关闭所有打开的 Modal，恢复页面滚动
+  document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.style.display = 'none';
+  });
+  document.body.style.overflow = '';
 
-    qsa('[data-panel]').forEach(p => {
-        p.classList.toggle('active', p.dataset.panel === tab);
-    });
+  qsa('[data-nav]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.nav === tab);
+  });
 
-    const titleEl = qs('topbar-title');
-    if (titleEl) titleEl.textContent = TAB_TITLES[tab];
+  qsa('[data-panel]').forEach(p => {
+    p.classList.toggle('active', p.dataset.panel === tab);
+  });
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const titleEl = qs('topbar-title');
+  if (titleEl) titleEl.textContent = TAB_TITLES[tab];
 
-    refreshTab(tab);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  refreshTab(tab);
 }
 
 export function refreshTab(tab = currentTab) {

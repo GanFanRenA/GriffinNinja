@@ -1959,3 +1959,94 @@ label.radio input {
   font-size: 28px;
   flex-shrink: 0;
 }
+
+/* ============================================================
+   设置：分组开关（父 → 子）
+   ============================================================ */
+.setting-group {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg);
+  margin-bottom: var(--sp-3);
+}
+.setting-group:last-child { margin-bottom: 0; }
+
+.setting-group .setting-row {
+  padding: 12px 0;
+}
+
+.setting-row.is-parent .setting-label {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.setting-children {
+  margin-top: 4px;
+  margin-left: 12px;
+  padding-left: 16px;
+  border-left: 2px solid var(--border);
+  transition: opacity 0.15s;
+}
+
+.setting-children.is-disabled {
+  opacity: 0.45;
+}
+
+.setting-children .setting-row {
+  padding: 8px 0;
+  border-bottom: none;
+}
+.setting-children .setting-row:last-child {
+  padding-bottom: 0;
+}
+
+.setting-children .setting-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* ============================================================
+   可折叠卡片
+   ============================================================ */
+.card.collapsible .collapsible-head {
+  cursor: pointer;
+  user-select: none;
+  transition: margin-bottom 0.15s;
+}
+
+.card.collapsible.is-collapsed .collapsible-head {
+  margin-bottom: 0;
+}
+
+.card.collapsible .collapsible-head:hover h2 {
+  color: var(--text);
+}
+
+.card.collapsible .collapse-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--text-tertiary);
+  transition: transform 0.2s ease, color 0.15s;
+  flex-shrink: 0;
+}
+
+.card.collapsible .collapsible-head:hover .collapse-chevron {
+  color: var(--text);
+}
+
+.card.collapsible.is-collapsed .collapse-chevron {
+  transform: rotate(-90deg);
+}
+
+.card.collapsible .collapsible-body {
+  overflow: hidden;
+}
+
+.card.collapsible.is-collapsed .collapsible-body {
+  display: none;
+}

@@ -392,67 +392,71 @@
                     </div>
                 </section>
 
-                <!-- ==================== 全局链 ==================== -->
+                                <!-- ==================== 全局链 ==================== -->
                 <section class="tab-panel" data-panel="chain">
                     <!-- 复活 -->
-                    <div class="card">
-                        <div class="card-head">
+                    <div class="card collapsible" data-collapse-key="chain-reinsert">
+                        <div class="card-head collapsible-head" data-collapse-trigger>
                             <h2>重新加入已淘汰者</h2>
+                            <span class="collapse-chevron" aria-hidden="true">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M6 9l6 6 6-6"/>
+                                </svg>
+                            </span>
                         </div>
-                        <p class="hint" style="margin-bottom:8px">
-                            搜索一名已淘汰的参与者，再选择插入位置：<strong>Hunter → 新加入者 → 原目标</strong>。
-                        </p>
-
-                        <div class="field">
-                            <label for="reinsert-search">搜索已淘汰者</label>
-                            <input type="text" id="reinsert-search" placeholder="输入姓名或邮箱">
-                        </div>
-                        <div id="reinsert-search-results"></div>
-
-                        <div id="reinsert-selected"
-                            style="display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
-                            <p class="hint" style="margin-bottom:8px">已选择：<strong id="reinsert-selected-name">-</strong>
+                        <div class="collapsible-body">
+                            <p class="hint" style="margin-bottom:8px">
+                                搜索一名已淘汰的参与者，再选择插入位置：<strong>Hunter → 新加入者 → 原目标</strong>。
                             </p>
+
                             <div class="field">
-                                <label for="reinsert-hunter-select">插入位置（Hunter → 原目标）</label>
-                                <select id="reinsert-hunter-select"></select>
+                                <label for="reinsert-search">搜索已淘汰者</label>
+                                <input type="text" id="reinsert-search" placeholder="输入姓名或邮箱">
                             </div>
-                            <div class="btn-row">
-                                <button class="btn btn-primary" id="btn-confirm-reinsert">确认加入</button>
-                                <button class="btn btn-secondary" id="btn-cancel-reinsert">取消</button>
+                            <div id="reinsert-search-results"></div>
+
+                            <div id="reinsert-selected" style="display:none;margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+                                <p class="hint" style="margin-bottom:8px">已选择：<strong id="reinsert-selected-name">-</strong></p>
+                                <div class="field">
+                                    <label for="reinsert-hunter-select">插入位置（Hunter → 原目标）</label>
+                                    <select id="reinsert-hunter-select"></select>
+                                </div>
+                                <div class="btn-row">
+                                    <button class="btn btn-primary" id="btn-confirm-reinsert">确认加入</button>
+                                    <button class="btn btn-secondary" id="btn-cancel-reinsert">取消</button>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- 链 -->
-                    <div class="card">
-                        <div class="card-head">
+                    <div class="card collapsible" data-collapse-key="chain-main">
+                        <div class="card-head collapsible-head" data-collapse-trigger>
                             <h2>全局链</h2>
-                            <button class="btn btn-ghost btn-sm" id="btn-refresh-chain">刷新</button>
-                        </div>
-
-                        <div class="filter-bar">
-                            <input type="text" class="search-input" id="chain-search" placeholder="搜索姓名 / 代码 / 目标">
-                            <select id="chain-filter-status">
-                                <option value="">全部状态</option>
-                                <option value="alive">存活</option>
-                                <option value="eliminated">已淘汰</option>
-                                <option value="winner">赢家</option>
-                            </select>
-                        </div>
-
-                        <div id="chain-list">
-                            <div class="skeleton-row">
-                                <div class="skeleton w-40"></div>
-                                <div class="skeleton w-40"></div>
+                            <div class="row" style="gap:6px;align-items:center">
+                                <button class="btn btn-ghost btn-sm" id="btn-refresh-chain" data-no-collapse>刷新</button>
+                                <span class="collapse-chevron" aria-hidden="true">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M6 9l6 6 6-6"/>
+                                    </svg>
+                                </span>
                             </div>
-                            <div class="skeleton-row">
-                                <div class="skeleton w-40"></div>
-                                <div class="skeleton w-40"></div>
+                        </div>
+                        <div class="collapsible-body">
+                            <div class="filter-bar">
+                                <input type="text" class="search-input" id="chain-search" placeholder="搜索姓名 / 代码 / 目标">
+                                <select id="chain-filter-status">
+                                    <option value="">全部状态</option>
+                                    <option value="alive">存活</option>
+                                    <option value="eliminated">已淘汰</option>
+                                    <option value="winner">赢家</option>
+                                </select>
                             </div>
-                            <div class="skeleton-row">
-                                <div class="skeleton w-40"></div>
-                                <div class="skeleton w-40"></div>
+
+                            <div id="chain-list">
+                                <div class="skeleton-row"><div class="skeleton w-40"></div><div class="skeleton w-40"></div></div>
+                                <div class="skeleton-row"><div class="skeleton w-40"></div><div class="skeleton w-40"></div></div>
+                                <div class="skeleton-row"><div class="skeleton w-40"></div><div class="skeleton w-40"></div></div>
                             </div>
                         </div>
                     </div>

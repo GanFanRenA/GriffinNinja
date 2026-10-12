@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>登录 - NinjaTag</title>
+  <title data-i18n="login.pageTitle">登录 - NinjaTag</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -12,35 +12,32 @@
   <header class="site-header">
     <h1>NinjaTag</h1>
     <nav>
-      <a href="index.html">首页</a>
+      <a href="index.html" data-i18n="header.home">首页</a>
+      <div id="lang-switch"></div>
     </nav>
   </header>
-
   <main class="container">
     <section class="card">
-      <h2>管理员登录</h2>
-      <p class="hint">使用学校邮箱（或姓名）与密码登录。</p>
-
+      <h2 data-i18n="login.title">管理员登录</h2>
+      <p class="hint" data-i18n="login.subtitle">使用学校邮箱（或姓名）与密码登录。</p>
       <div id="message" class="message" style="display:none"></div>
-
       <div class="field">
-        <label for="email">邮箱 / 姓名</label>
-        <input type="text" id="email" placeholder="your@school.edu 或 姓名" autocomplete="username">
+        <label for="email" data-i18n="login.emailLabel">邮箱 / 姓名</label>
+        <input type="text" id="email" data-i18n-placeholder="login.emailPlaceholder" placeholder="your@school.edu 或 姓名"
+          autocomplete="username">
       </div>
-
       <div class="field">
-        <label for="password">密码</label>
-        <input type="password" id="password" placeholder="密码" autocomplete="current-password">
+        <label for="password" data-i18n="login.passwordLabel">密码</label>
+        <input type="password" id="password" data-i18n-placeholder="login.passwordPlaceholder" placeholder="密码"
+          autocomplete="current-password">
       </div>
-
-      <button id="btn-login" class="btn btn-primary btn-block">登录</button>
-
+      <button id="btn-login" class="btn btn-primary btn-block" data-i18n="login.submit">登录</button>
       <p class="hint" style="margin-top:16px;text-align:center">
-        还没有账号？<a href="register.html">注册</a>
+        <span data-i18n="login.noAccount">还没有账号？</span>
+        <a href="register.html" data-i18n="login.registerLink">注册</a>
       </p>
     </section>
   </main>
-
   <script type="module" src="js/login.js"></script>
 </body>
 

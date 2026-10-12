@@ -1,20 +1,19 @@
 // js/admin-records.js
 // 记录：击杀记录（可撤销）+ 历史记录（击杀/撤销/复活，可搜索）
-
 import { supabase } from './supabase.js';
 import { state } from './admin.js';
 import {
     qs, showToast, confirmDialog, escapeHtml, debounce,
-    formatTime, formatRelative,
-    skeletonRows, emptyState,
+    formatTime, formatRelative, skeletonRows, emptyState,
 } from './utils.js';
+import { t } from './i18n.js';
 
-const KILL_REASONS = {
-    normal: { label: '正常击杀', award: true },
-    rule_violation: { label: '违反规则', award: true },
-    task_incomplete: { label: '未完成任务', award: true },
-    absent: { label: '缺勤', award: true },
-    no_points: { label: '不计分击杀', award: false },
+const KILL_REASON_KEYS = {
+    normal: { labelKey: 'chain.killReasonNormal', award: true },
+    rule_violation: { labelKey: 'chain.killReasonRuleViolation', award: true },
+    task_incomplete: { labelKey: 'chain.killReasonTaskIncomplete', award: true },
+    absent: { labelKey: 'chain.killReasonAbsent', award: true },
+    no_points: { labelKey: 'chain.killReasonNoPoints', award: false },
 };
 
 let historyKeyword = '';
@@ -24,7 +23,6 @@ let historySig = '';
 /* ============================================================
    初始化
    ============================================================ */
-
 export function initRecords() {
     qs('btn-refresh-elims')?.addEventListener('click', () => refreshEliminations());
     qs('btn-refresh-history')?.addEventListener('click', () => refreshHistory());
@@ -36,10 +34,17 @@ export function initRecords() {
     }, 200));
 }
 
+// 供 admin.js 在语言切换时调用
+export function refreshRecordsI18n() {
+    eliminationsSig = '';
+    historySig = '';
+    renderEliminations();
+    renderHistory();
+}
+
 /* ============================================================
    加载
    ============================================================ */
-
 export async function refreshRecords() {
     await Promise.all([refreshEliminations(), refreshHistory()]);
 }
@@ -52,7 +57,7 @@ async function refreshEliminations() {
 
     if (error || data?.error) {
         if (el) el.innerHTML = emptyState({
-            title: '加载失败',
+            title: t('common.loadFailed'),
             desc: error?.message || data?.error,
         });
         return;
@@ -71,7 +76,7 @@ async function refreshHistory() {
 
     if (error || data?.error) {
         if (el) el.innerHTML = emptyState({
-            title: '加载失败',
+            title: t('common.loadFailed'),
             desc: error?.message || data?.error,
         });
         return;
@@ -85,25 +90,22 @@ async function refreshHistory() {
 /* ============================================================
    击杀记录
    ============================================================ */
-
 function renderEliminations() {
     const el = qs('eliminations-list');
     if (!el) return;
-
     const list = state.eliminations;
+
     if (!list.length) {
         el.innerHTML = emptyState({
             icon: 'clock',
-            title: '暂无击杀记录',
-            desc: '活动开始后，击杀会显示在这里。',
+            title: t('records.noEliminations'),
+            desc: t('records.noEliminationsDesc'),
         });
         eliminationsSig = '';
         return;
     }
 
-    const sig = list.map(e =>
-        `${e.id}:${e.status}:${e.created_at}:${e.revoke_reason || ''}`
-    ).join('|');
+    const sig = list.map(e => `${e.id}:${e.status}:${e.created_at}:${e.revoke_reason || ''}`).join('|');
     if (sig === eliminationsSig) return;
     eliminationsSig = sig;
 
@@ -112,11 +114,11 @@ function renderEliminations() {
       <table class="data-table">
         <thead>
           <tr>
-            <th>击杀</th>
-            <th>学院</th>
-            <th>时间</th>
-            <th>状态</th>
-            <th class="text-right">操作</th>
+            <th>${escapeHtml(t('records.colKill'))}</th>
+            <th>${escapeHtml(t('records.colCollege'))}</th>
+            <th>${escapeHtml(t('records.colTime'))}</th>
+            <th>${escapeHtml(t('records.colStatus'))}</th>
+            <th class="text-right">${escapeHtml(t('records.colActions'))}</th>
           </tr>
         </thead>
         <tbody>
@@ -125,35 +127,48 @@ function renderEliminations() {
       </table>
     </div>
   `;
-
     bindElimEvents();
 }
 
 function elimRow(e) {
-    const reason = KILL_REASONS[e.reason] || null;
+    const info = KILL_REASON_KEYS[e.reason] || null;
+    const reasonLabel = info ? t(info.labelKey) : '';
+
     const statusMap = {
-        valid: ['badge-success', '有效'],
-        revoked: ['badge-neutral', '已撤销'],
+        valid: ['badge-success', t('records.statusValid')],
+        revoked: ['badge-neutral', t('records.statusRevoked')],
     };
     const [cls, label] = statusMap[e.status] || ['badge-neutral', e.status || '—'];
 
+    const colKill = escapeHtml(t('records.colKill'));
+    const colCollege = escapeHtml(t('records.colCollege'));
+    const colTime = escapeHtml(t('records.colTime'));
+    const colStatus = escapeHtml(t('records.colStatus'));
+    const colActions = escapeHtml(t('records.colActions'));
+
+    const reasonLine = reasonLabel
+        ? escapeHtml(t('records.reasonLabel', { reason: reasonLabel })) +
+        ' · ' +
+        (e.points_awarded ? escapeHtml(t('records.pointsAwarded', { n: e.points_awarded })) : escapeHtml(t('records.pointsNone')))
+        : '';
+
     return `
     <tr data-id="${escapeHtml(e.id)}">
-      <td data-label="击杀">
+      <td data-label="${colKill}">
         <div class="cell-main">${escapeHtml(e.hunter_name || '?')} → ${escapeHtml(e.target_name || '?')}</div>
-        ${reason ? `<div class="cell-sub">原因：${escapeHtml(reason.label)}${e.points_awarded ? ` · +${e.points_awarded}` : ' · 不加分'}</div>` : ''}
+        ${reasonLine ? `<div class="cell-sub">${reasonLine}</div>` : ''}
       </td>
-      <td data-label="学院">
+      <td data-label="${colCollege}">
         <div class="cell-sub">${escapeHtml(e.hunter_college || '—')} → ${escapeHtml(e.target_college || '—')}</div>
       </td>
-      <td data-label="时间">
+      <td data-label="${colTime}">
         <div>${escapeHtml(formatTime(e.created_at))}</div>
         <div class="cell-sub">${escapeHtml(formatRelative(e.created_at))}</div>
       </td>
-      <td data-label="状态"><span class="badge ${cls}">${escapeHtml(label)}</span></td>
-      <td class="cell-actions" data-label="操作">
+      <td data-label="${colStatus}"><span class="badge ${cls}">${escapeHtml(label)}</span></td>
+      <td class="cell-actions" data-label="${colActions}">
         ${e.status === 'valid'
-            ? `<button class="btn-mini btn-warn" data-revoke="${escapeHtml(e.id)}">撤销</button>`
+            ? `<button class="btn-mini btn-warn" data-revoke="${escapeHtml(e.id)}">${escapeHtml(t('records.revokeBtn'))}</button>`
             : `<span class="hint">${escapeHtml(e.revoke_reason || '')}</span>`}
       </td>
     </tr>
@@ -163,7 +178,6 @@ function elimRow(e) {
 function bindElimEvents() {
     const el = qs('eliminations-list');
     if (!el) return;
-
     el.querySelectorAll('[data-revoke]').forEach(btn => {
         btn.addEventListener('click', () => revokeKill(btn.dataset.revoke));
     });
@@ -173,29 +187,34 @@ async function revokeKill(elimId) {
     const elim = state.eliminations.find(x => x.id === elimId);
     if (!elim) return;
 
-    const reasonInfo = KILL_REASONS[elim.reason];
+    const info = KILL_REASON_KEYS[elim.reason];
     const lines = [];
-    lines.push(`撤销 <strong>${escapeHtml(elim.hunter_name || '?')}</strong> 击杀 <strong>${escapeHtml(elim.target_name || '?')}</strong>。`);
-    if (reasonInfo) lines.push(`原击杀原因：${escapeHtml(reasonInfo.label)}。`);
-    lines.push(`被淘汰者将恢复为存活状态，猎人目标将恢复到击杀前的目标。`);
+    lines.push(t('records.revokeLine1', {
+        hunter: `<strong>${escapeHtml(elim.hunter_name || '?')}</strong>`,
+        target: `<strong>${escapeHtml(elim.target_name || '?')}</strong>`,
+    }));
+    if (info) {
+        lines.push(t('records.revokeLine2', { reason: escapeHtml(t(info.labelKey)) }));
+    }
+    lines.push(t('records.revokeLine3'));
     if (elim.points_awarded) {
-        lines.push(`<strong>${escapeHtml(elim.hunter_college || '相关学院')}</strong> 将扣回 <strong style="color:#fca5a5">${elim.points_awarded}</strong> 分。`);
+        lines.push(t('records.revokeLine4', {
+            college: `<strong>${escapeHtml(elim.hunter_college || '—')}</strong>`,
+            points: `<strong style="color:#fca5a5">${elim.points_awarded}</strong>`,
+        }));
     }
 
     const ok = await confirmDialog({
-        title: '撤销击杀',
+        title: t('records.revokeTitle'),
         message: lines.join('<br>'),
-        confirmText: '确认撤销',
+        confirmText: t('records.revokeConfirm'),
         danger: true,
         requireInput: {
-            label: '请填写撤销原因（可选，直接回车确认）',
-            // 不要求匹配文本，直接回车即可
+            label: t('records.revokeInputLabel'),
         },
     });
-    // confirmDialog 的 requireInput.value 若未设置，则接受任意输入
     if (!ok) return;
 
-    // 取输入值作为 revoke_reason
     const reasonInput = qs('confirm-input');
     const revokeReason = reasonInput?.value.trim() || '';
 
@@ -205,37 +224,45 @@ async function revokeKill(elimId) {
     });
 
     if (error || data?.error) {
-        const errMap = {
-            not_admin: '你不是管理员',
-            elimination_not_found: '击杀记录不存在',
-            already_revoked: '该击杀已被撤销',
-            event_not_active: '活动未进行中',
-        };
-        showToast('撤销失败：' + (errMap[data?.error] || error?.message || data?.error), 'error');
+        const msg = mapRevokeErr(data?.error) || error?.message || data?.error;
+        showToast(t('records.revokeFailed', { msg }), 'error');
         return;
     }
 
-    showToast('已撤销', 'success');
+    showToast(t('records.revoked'), 'success');
     await Promise.all([refreshEliminations(), refreshHistory()]);
+}
+
+function mapRevokeErr(code) {
+    const m = {
+        not_admin: t('records.errNotAdmin'),
+        elimination_not_found: t('records.errNotFound'),
+        already_revoked: t('records.errAlreadyRevoked'),
+        event_not_active: t('records.errEventNotActive'),
+    };
+    return m[code];
 }
 
 /* ============================================================
    历史记录
    ============================================================ */
-
 function getFilteredHistory() {
     const kw = historyKeyword;
     if (!kw) return state.history;
-
     return state.history.filter(h => {
         const d = h.details || {};
-        const hay = [
+        const parts = [
             h.type,
             d.hunter_name, d.target_name, d.participant_name,
             d.hunter_college, d.target_college,
             d.revoke_reason, d.revoked_by_email, d.admin_email,
             d.reason,
-        ].filter(Boolean).join(' ').toLowerCase();
+        ];
+        // 把原因的本地化标签也加进搜索索引
+        if (d.reason && KILL_REASON_KEYS[d.reason]) {
+            parts.push(t(KILL_REASON_KEYS[d.reason].labelKey));
+        }
+        const hay = parts.filter(Boolean).join(' ').toLowerCase();
         return hay.includes(kw);
     });
 }
@@ -243,22 +270,19 @@ function getFilteredHistory() {
 function renderHistory() {
     const el = qs('history-list');
     if (!el) return;
-
     const list = getFilteredHistory();
 
     if (!list.length) {
         el.innerHTML = state.history.length
-            ? emptyState({ icon: 'search', title: '没有匹配的记录', desc: '试试其他关键词。' })
-            : emptyState({
-                icon: 'clock',
-                title: '暂无历史记录',
-                desc: '击杀、撤销、复活会按时间倒序显示。',
-            });
+            ? emptyState({ icon: 'search', title: t('records.noHistoryMatch'), desc: t('records.noHistoryMatchDesc') })
+            : emptyState({ icon: 'clock', title: t('records.noHistory'), desc: t('records.noHistoryDesc') });
         historySig = '';
         return;
     }
 
-    const sig = list.map(h => `${h.type}:${h.happened_at}:${h.details?.hunter_name || ''}:${h.details?.target_name || ''}:${h.details?.participant_name || ''}`).join('|');
+    const sig = list.map(h =>
+        `${h.type}:${h.happened_at}:${h.details?.hunter_name || ''}:${h.details?.target_name || ''}:${h.details?.participant_name || ''}`
+    ).join('|');
     if (sig === historySig) return;
     historySig = sig;
 
@@ -266,70 +290,81 @@ function renderHistory() {
 }
 
 function historyItemHtml(h) {
-    const t = formatTime(h.happened_at);
+    const time = formatTime(h.happened_at);
     const rel = formatRelative(h.happened_at);
     const d = h.details || {};
 
     if (h.type === 'kill') {
-        const reasonInfo = KILL_REASONS[d.reason];
-        const reasonLabel = reasonInfo ? reasonInfo.label : (d.reason || '');
+        const info = KILL_REASON_KEYS[d.reason];
+        const reasonLabel = info ? t(info.labelKey) : (d.reason || '');
         const pts = d.points_awarded
             ? `<strong>${escapeHtml(d.hunter_college || '?')} +${d.points_awarded}</strong>`
-            : '不加分';
+            : escapeHtml(t('records.pointsNone'));
+
+        const sentence = t('records.historyKillSentence', {
+            hunter: `<strong>${escapeHtml(d.hunter_name || '?')}</strong>`,
+            target: `<strong>${escapeHtml(d.target_name || '?')}</strong>`,
+        });
+
         return `
       <div class="history-item">
-        <div class="history-time">${escapeHtml(t)}<div class="cell-sub">${escapeHtml(rel)}</div></div>
+        <div class="history-time">${escapeHtml(time)}<div class="cell-sub">${escapeHtml(rel)}</div></div>
         <div class="history-content">
-          <span class="history-tag tag-kill">击杀</span>
-          <strong>${escapeHtml(d.hunter_name || '?')}</strong>
-          击杀了
-          <strong>${escapeHtml(d.target_name || '?')}</strong>
+          <span class="history-tag tag-kill">${escapeHtml(t('records.tagKill'))}</span>
+          ${sentence}
           <span class="hint">（${pts}）</span>
-          ${reasonLabel ? `<div class="history-note">原因：${escapeHtml(reasonLabel)}</div>` : ''}
-          ${d.is_admin_kill ? `<div class="history-note">管理员操作</div>` : ''}
+          ${reasonLabel ? `<div class="history-note">${escapeHtml(t('records.historyKillReason', { reason: reasonLabel }))}</div>` : ''}
+          ${d.is_admin_kill ? `<div class="history-note">${escapeHtml(t('records.historyAdminOp'))}</div>` : ''}
         </div>
       </div>`;
     }
 
     if (h.type === 'revoke') {
-        const reasonInfo = KILL_REASONS[d.reason];
+        const info = KILL_REASON_KEYS[d.reason];
         const pts = d.points_awarded
             ? `<strong>${escapeHtml(d.hunter_college || '?')} -${d.points_awarded}</strong>`
             : '';
+
+        const sentence = t('records.historyRevokeSentence', {
+            hunter: `<strong>${escapeHtml(d.hunter_name || '?')}</strong>`,
+            target: `<strong>${escapeHtml(d.target_name || '?')}</strong>`,
+        });
+
         return `
       <div class="history-item">
-        <div class="history-time">${escapeHtml(t)}<div class="cell-sub">${escapeHtml(rel)}</div></div>
+        <div class="history-time">${escapeHtml(time)}<div class="cell-sub">${escapeHtml(rel)}</div></div>
         <div class="history-content">
-          <span class="history-tag tag-revoke">撤销</span>
-          撤销了 <strong>${escapeHtml(d.hunter_name || '?')}</strong>
-          击杀 <strong>${escapeHtml(d.target_name || '?')}</strong>
+          <span class="history-tag tag-revoke">${escapeHtml(t('records.tagRevoke'))}</span>
+          ${sentence}
           ${pts ? `<span class="hint">（${pts}）</span>` : ''}
-          ${reasonInfo ? `<div class="history-note">原击杀原因：${escapeHtml(reasonInfo.label)}</div>` : ''}
-          ${d.revoke_reason ? `<div class="history-note">撤销原因：${escapeHtml(d.revoke_reason)}</div>` : ''}
-          ${d.revoked_by_email ? `<div class="history-note">操作者：${escapeHtml(d.revoked_by_email)}</div>` : ''}
+          ${info ? `<div class="history-note">${escapeHtml(t('records.historyOriginalReason', { reason: t(info.labelKey) }))}</div>` : ''}
+          ${d.revoke_reason ? `<div class="history-note">${escapeHtml(t('records.historyRevokeReason', { reason: d.revoke_reason }))}</div>` : ''}
+          ${d.revoked_by_email ? `<div class="history-note">${escapeHtml(t('records.historyOperator', { email: d.revoked_by_email }))}</div>` : ''}
         </div>
       </div>`;
     }
 
     if (h.type === 'reinsert') {
+        const sentence = t('records.historyReinsertSentence', {
+            name: `<strong>${escapeHtml(d.participant_name || '?')}</strong>`,
+            hunter: `<strong>${escapeHtml(d.hunter_name || '?')}</strong>`,
+        });
         return `
       <div class="history-item">
-        <div class="history-time">${escapeHtml(t)}<div class="cell-sub">${escapeHtml(rel)}</div></div>
+        <div class="history-time">${escapeHtml(time)}<div class="cell-sub">${escapeHtml(rel)}</div></div>
         <div class="history-content">
-          <span class="history-tag tag-reinsert">复活</span>
-          将 <strong>${escapeHtml(d.participant_name || '?')}</strong>
-          重新加入环中（插入到 <strong>${escapeHtml(d.hunter_name || '?')}</strong> 之后）
-          ${d.admin_email ? `<div class="history-note">操作者：${escapeHtml(d.admin_email)}</div>` : ''}
+          <span class="history-tag tag-reinsert">${escapeHtml(t('records.tagReinsert'))}</span>
+          ${sentence}
+          ${d.admin_email ? `<div class="history-note">${escapeHtml(t('records.historyOperator', { email: d.admin_email }))}</div>` : ''}
         </div>
       </div>`;
     }
 
-    // 其它类型
     return `
     <div class="history-item">
-      <div class="history-time">${escapeHtml(t)}</div>
+      <div class="history-time">${escapeHtml(time)}</div>
       <div class="history-content">
-        <span class="history-tag tag-admin">${escapeHtml(h.type || '操作')}</span>
+        <span class="history-tag tag-admin">${escapeHtml(h.type || '—')}</span>
         ${escapeHtml(JSON.stringify(d).slice(0, 120))}
       </div>
     </div>`;

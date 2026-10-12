@@ -2213,3 +2213,55 @@ label.radio input {
   color: var(--primary);
   font-weight: 600;
 }
+
+/* ============================================================
+   语言切换器
+   ============================================================ */
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-full);
+  background: var(--elevated);
+  border: 1px solid var(--border);
+}
+
+.lang-switch button {
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  line-height: 1.4;
+}
+
+.lang-switch button:hover {
+  color: var(--text);
+}
+
+.lang-switch button.is-active {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* 后台侧边栏底部的语言切换器占满整行 */
+.sidebar-footer .lang-switch {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  margin-bottom: var(--sp-2);
+}
+
+/* 移动端「更多」抽屉中的语言切换器 */
+.more-drawer .lang-switch {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  margin-top: var(--sp-4);
+  padding: 4px;
+}

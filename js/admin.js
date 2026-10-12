@@ -1,52 +1,56 @@
 // js/admin.js
 // 入口：会话守卫、Tab 路由、概览页、事件操作
-
 import { supabase } from './supabase.js';
 import { requireLogin, signOut, checkIsAdmin, getUser } from './auth.js';
 import {
     qs, qsa, showToast, setLoading, confirmDialog,
-    bindModalBackdrop, formatRelative, escapeHtml,
-    emptyState,
+    bindModalBackdrop, formatRelative, escapeHtml, emptyState,
 } from './utils.js';
-
-import { initParticipants, refreshParticipants } from './admin-participants.js';
-import { initChain, refreshChain } from './admin-chain.js';
-import { initRecords, refreshRecords } from './admin-records.js';
+import {
+    initParticipants, refreshParticipants, refreshParticipantsI18n,
+} from './admin-participants.js';
+import {
+    initChain, refreshChain, refreshChainI18n,
+} from './admin-chain.js';
+import {
+    initRecords, refreshRecords, refreshRecordsI18n,
+} from './admin-records.js';
 import {
     initColleges, refreshColleges,
     initRules, refreshRules,
     initAdmins, refreshAdmins,
-    initSettings, refreshSettings,
+    initSettings, refreshSettings, refreshMiscI18n,
 } from './admin-misc.js';
+import { t, initI18n, applyI18n, mountLanguageSwitcher } from './i18n.js';
+
+initI18n();
 
 /* ============================================================
    共享状态（供其它 admin-*.js 模块读取）
    ============================================================ */
-
 export const state = {
-    event: null,           // { id, name, status, current_day }
-    home: null,            // get_public_home 返回值
-    colleges: [],          // admin_get_colleges
-    participants: [],      // admin_get_participants
-    chain: [],             // admin_get_global_chain
-    rules: [],             // admin_get_daily_rules
-    history: [],           // admin_get_history
-    eliminations: [],      // admin_get_eliminations
+    event: null,
+    home: null,
+    colleges: [],
+    participants: [],
+    chain: [],
+    rules: [],
+    history: [],
+    eliminations: [],
     userEmail: '',
 };
 
-const TAB_TITLES = {
-    overview: '概览',
-    participants: '参与者',
-    colleges: '学院',
-    rules: '每日规则',
-    chain: '全局链',
-    records: '记录',
-    admins: '管理员',
-    settings: '设置',
+const TAB_KEYS = {
+    overview: 'tab.overview',
+    participants: 'tab.participants',
+    colleges: 'tab.colleges',
+    rules: 'tab.rules',
+    chain: 'tab.chain',
+    records: 'tab.records',
+    admins: 'tab.admins',
+    settings: 'tab.settings',
 };
 
-// 收纳在「更多」抽屉中的 Tab
 const MORE_TABS = ['colleges', 'rules', 'admins', 'settings'];
 
 let currentTab = 'overview';
@@ -54,31 +58,27 @@ let currentTab = 'overview';
 /* ============================================================
    Tab 路由
    ============================================================ */
-
 export function goto(tab) {
-    if (!TAB_TITLES[tab]) return;
+    if (!TAB_KEYS[tab]) return;
     currentTab = tab;
-    // 切换 Tab 时关闭所有打开的 Modal，恢复页面滚动
-    document.querySelectorAll('.modal-overlay').forEach(m => {
-        m.style.display = 'none';
-    });
+
+    document.querySelectorAll('.modal-overlay').forEach(m => { m.style.display = 'none'; });
     document.body.style.overflow = '';
-    // 关闭「更多」抽屉
+
     closeMoreDrawer();
+
     qsa('[data-nav]').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.nav === tab);
     });
-    // 「更多」按钮：当前 Tab 属于抽屉时高亮
     const moreToggle = document.querySelector('[data-more-toggle]');
     if (moreToggle) {
         moreToggle.classList.toggle('active', MORE_TABS.includes(tab));
     }
+
     const titleEl = qs('topbar-title');
-    if (titleEl) titleEl.textContent = TAB_TITLES[tab];
-    window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-    });
+    if (titleEl) titleEl.textContent = t(TAB_KEYS[tab]);
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     refreshTab(tab);
 }
 
@@ -95,18 +95,17 @@ export function refreshTab(tab = currentTab) {
     }
 }
 
-// 供外部模块读取当前 Tab
-export function getCurrentTab() { return currentTab; }
+export function getCurrentTab() {
+    return currentTab;
+}
 
 /* ============================================================
    概览页
    ============================================================ */
-
 async function loadOverview() {
     const loadingEl = qs('overview-loading');
     const bodyEl = qs('overview-body');
     if (!loadingEl || !bodyEl) return;
-
     loadingEl.style.display = '';
     bodyEl.style.display = 'none';
 
@@ -118,9 +117,7 @@ async function loadOverview() {
             supabase.rpc('admin_get_history', { p_limit: 5 }),
             supabase.rpc('admin_get_daily_rules'),
         ]);
-
         if (evt.error) throw evt.error;
-
         state.event = evt.data || null;
         state.colleges = Array.isArray(cols.data) ? cols.data : [];
         state.home = home.data || null;
@@ -137,7 +134,7 @@ async function loadOverview() {
         bodyEl.style.display = '';
     } catch (err) {
         loadingEl.innerHTML = emptyState({
-            title: '加载失败',
+            title: t('common.loadFailed'),
             desc: err?.message || String(err),
         });
     }
@@ -147,11 +144,11 @@ function renderHero() {
     const event = state.event;
     const home = state.home || {};
 
-    const statusMap = {
-        draft: '未开始',
-        active: '进行中',
-        paused: '已暂停',
-        ended: '已结束',
+    const statusKey = {
+        draft: 'overview.statusDraft',
+        active: 'overview.statusActive',
+        paused: 'overview.statusPaused',
+        ended: 'overview.statusEnded',
     };
     const badgeCls = {
         draft: 'badge-neutral',
@@ -159,51 +156,42 @@ function renderHero() {
         paused: 'badge-warning',
         ended: 'badge-neutral',
     };
-
     const status = event?.status || 'draft';
 
-    qs('hero-status').innerHTML =
-        `<span class="badge ${badgeCls[status] || 'badge-neutral'}">` +
-        `<span class="dot"></span>${escapeHtml(statusMap[status] || status)}</span>`;
-
+    qs('hero-status').innerHTML = `<span class="badge ${badgeCls[status] || 'badge-neutral'}">` +
+        `<span class="dot"></span>${escapeHtml(t(statusKey[status] || 'overview.statusDraft'))}</span>`;
     qs('hero-day-badge').innerHTML = event?.name
-        ? `<span class="hint">${escapeHtml(event.name)}</span>`
-        : '';
-
+        ? `<span class="hint">${escapeHtml(event.name)}</span>` : '';
     qs('hero-alive').textContent = home.alive_count ?? '—';
     qs('hero-eliminated').textContent = home.eliminated_count ?? '—';
-    qs('hero-day').textContent =
-        status === 'active' && event?.current_day ? `Day ${event.current_day}` : '—';
+    qs('hero-day').textContent = status === 'active' && event?.current_day
+        ? t('public.dayText', { n: event.current_day }) : '—';
 
     const actions = qs('hero-actions');
     if (!actions) return;
-
-    if (!event) {
-        actions.innerHTML = '';
-        return;
-    }
+    if (!event) { actions.innerHTML = ''; return; }
 
     if (status === 'draft') {
         actions.innerHTML = `
-      <button class="btn btn-primary" data-action="start">开始活动</button>
-      <button class="btn btn-secondary" data-action="reshuffle">重新打乱</button>
+      <button class="btn btn-primary" data-action="start">${escapeHtml(t('overview.startBtn'))}</button>
+      <button class="btn btn-secondary" data-action="reshuffle">${escapeHtml(t('overview.reshuffleBtn'))}</button>
     `;
     } else if (status === 'active') {
         actions.innerHTML = `
-      <button class="btn btn-secondary" data-action="pause">暂停活动</button>
-      <button class="btn btn-secondary" data-action="reshuffle">重新打乱</button>
-      <button class="btn btn-danger" data-action="end">结束活动</button>
+      <button class="btn btn-secondary" data-action="pause">${escapeHtml(t('overview.pauseBtn'))}</button>
+      <button class="btn btn-secondary" data-action="reshuffle">${escapeHtml(t('overview.reshuffleBtn'))}</button>
+      <button class="btn btn-danger" data-action="end">${escapeHtml(t('overview.endBtn'))}</button>
     `;
     } else if (status === 'paused') {
         actions.innerHTML = `
-      <button class="btn btn-primary" data-action="resume">继续活动</button>
-      <button class="btn btn-secondary" data-action="reshuffle">重新打乱</button>
-      <button class="btn btn-danger" data-action="end">结束活动</button>
+      <button class="btn btn-primary" data-action="resume">${escapeHtml(t('overview.resumeBtn'))}</button>
+      <button class="btn btn-secondary" data-action="reshuffle">${escapeHtml(t('overview.reshuffleBtn'))}</button>
+      <button class="btn btn-danger" data-action="end">${escapeHtml(t('overview.endBtn'))}</button>
     `;
     } else {
         actions.innerHTML = `
-      <button class="btn btn-primary" data-action="start">开始新活动</button>
-      <button class="btn btn-secondary" data-goto="records">查看记录</button>
+      <button class="btn btn-primary" data-action="start">${escapeHtml(t('overview.startNewBtn'))}</button>
+      <button class="btn btn-secondary" data-goto="records">${escapeHtml(t('overview.viewRecordsBtn'))}</button>
     `;
     }
 }
@@ -213,10 +201,8 @@ function renderSuggest() {
     const textEl = qs('suggest-text');
     const actionEl = qs('suggest-action');
     if (!bar) return;
-
     const event = state.event;
     const home = state.home || {};
-
     if (!event) { bar.style.display = 'none'; return; }
 
     let msg = '';
@@ -225,29 +211,27 @@ function renderSuggest() {
 
     if (event.status === 'draft') {
         if (!state.participants.length && !home.alive_count) {
-            msg = '还没有参与者，先导入名单再开始活动。';
-            actionLabel = '去添加';
+            msg = t('overview.suggestDraftNoParticipants');
+            actionLabel = t('overview.suggestGoAdd');
             actionTab = 'participants';
         } else {
-            msg = `已准备 ${home.alive_count || state.participants.length || 0} 名参与者，可以开始活动。`;
-            actionLabel = '查看名单';
+            msg = t('overview.suggestDraftReady', { n: home.alive_count || state.participants.length || 0 });
+            actionLabel = t('overview.suggestViewList');
             actionTab = 'participants';
         }
     } else if (event.status === 'active') {
         if (!home.today_rule) {
-            msg = `Day ${event.current_day} 的规则尚未发布。`;
-            actionLabel = '去发布';
+            msg = t('overview.suggestRuleMissing', { n: event.current_day });
+            actionLabel = t('overview.suggestGoPublish');
             actionTab = 'rules';
         }
     } else if (event.status === 'paused') {
-        msg = '活动已暂停，所有击杀已冻结。';
+        msg = t('overview.suggestPaused');
     }
 
     if (!msg) { bar.style.display = 'none'; return; }
-
     bar.style.display = 'flex';
     textEl.textContent = msg;
-
     if (actionLabel && actionTab) {
         actionEl.style.display = '';
         actionEl.textContent = actionLabel;
@@ -261,20 +245,21 @@ function renderSuggest() {
 function renderOverviewColleges() {
     const el = qs('overview-colleges');
     if (!el) return;
-
     const colleges = state.colleges;
     if (!colleges.length) {
-        el.innerHTML = emptyState({ title: '暂无学院', desc: '请先在「学院」标签添加学院。' });
+        el.innerHTML = emptyState({
+            title: t('overview.noColleges'),
+            desc: t('overview.noCollegesHint'),
+        });
         return;
     }
-
     el.innerHTML = colleges.map(c => `
     <div class="college-card" style="border-color:${escapeHtml(c.color || '#555')}">
       <div class="college-name" style="background:${escapeHtml(c.color || '#555')}">
         ${escapeHtml(c.name)}
       </div>
       <div class="college-score">${c.score ?? 0}</div>
-      <div class="college-count">${c.participant_count ?? 0} 人</div>
+      <div class="college-count">${escapeHtml(t('colleges.peopleUnit', { n: c.participant_count ?? 0 }))}</div>
     </div>
   `).join('');
 }
@@ -282,16 +267,14 @@ function renderOverviewColleges() {
 function renderOverviewRule() {
     const el = qs('overview-rule');
     if (!el) return;
-
     const rule = state.home?.today_rule;
     if (!rule) {
-        el.innerHTML = `<p class="hint">今日暂无规则。${state.event?.status === 'active' ? ' 可前往「每日规则」发布。' : ''
-            }</p>`;
+        const extra = state.event?.status === 'active' ? t('overview.noRuleHint') : '';
+        el.innerHTML = `<p class="hint">${escapeHtml(t('overview.noRule') + extra)}</p>`;
         return;
     }
-
     el.innerHTML = `
-    <div style="font-weight:600;margin-bottom:6px">${escapeHtml(rule.title || '未命名')}</div>
+    <div style="font-weight:600;margin-bottom:6px">${escapeHtml(rule.title || t('rules.unnamed'))}</div>
     <div class="hint" style="white-space:pre-wrap;line-height:1.6">${escapeHtml(rule.content || '')}</div>
   `;
 }
@@ -299,34 +282,37 @@ function renderOverviewRule() {
 function renderOverviewRecent(list) {
     const el = qs('overview-recent');
     if (!el) return;
-
     if (!list.length) {
-        el.innerHTML = `<p class="hint">暂无动态。</p>`;
+        el.innerHTML = `<p class="hint">${escapeHtml(t('overview.noRecent'))}</p>`;
         return;
     }
-
     el.innerHTML = list.slice(0, 5).map(h => {
-        const t = formatRelative(h.happened_at);
+        const time = formatRelative(h.happened_at);
         const d = h.details || {};
         let body = '';
-
         if (h.type === 'kill') {
-            body = `<strong>${escapeHtml(d.hunter_name || '?')}</strong> 击杀了 ` +
-                `<strong>${escapeHtml(d.target_name || '?')}</strong>`;
+            body = t('records.historyKillSentence', {
+                hunter: `<strong>${escapeHtml(d.hunter_name || '?')}</strong>`,
+                target: `<strong>${escapeHtml(d.target_name || '?')}</strong>`,
+            });
         } else if (h.type === 'revoke') {
-            body = `<span class="history-tag tag-revoke">撤销</span>` +
-                `撤销了 <strong>${escapeHtml(d.hunter_name || '?')}</strong> 击杀 ` +
-                `<strong>${escapeHtml(d.target_name || '?')}</strong>`;
+            body = `<span class="history-tag tag-revoke">${escapeHtml(t('records.tagRevoke'))}</span>` +
+                t('records.historyRevokeSentence', {
+                    hunter: `<strong>${escapeHtml(d.hunter_name || '?')}</strong>`,
+                    target: `<strong>${escapeHtml(d.target_name || '?')}</strong>`,
+                });
         } else if (h.type === 'reinsert') {
-            body = `<span class="history-tag tag-reinsert">复活</span>` +
-                `<strong>${escapeHtml(d.participant_name || '?')}</strong> 重新加入`;
+            body = `<span class="history-tag tag-reinsert">${escapeHtml(t('records.tagReinsert'))}</span>` +
+                t('records.historyReinsertSentence', {
+                    name: `<strong>${escapeHtml(d.participant_name || '?')}</strong>`,
+                    hunter: `<strong>${escapeHtml(d.hunter_name || '?')}</strong>`,
+                });
         } else {
             body = escapeHtml(h.type || '');
         }
-
         return `
       <div class="history-item">
-        <div class="history-time">${t}</div>
+        <div class="history-time">${escapeHtml(time)}</div>
         <div class="history-content">${body}</div>
       </div>`;
     }).join('');
@@ -344,23 +330,12 @@ function fillEventForm() {
 /* ============================================================
    事件操作
    ============================================================ */
-
 async function handleStart(btn) {
     const isRestart = state.event?.status === 'ended';
-
     const message = isRestart
-        ? '将开始一轮全新活动：<br>' +
-        '· 所有参与者重置为「存活」<br>' +
-        '· 重新生成代码与击杀环（避免同 House 互为目标）<br>' +
-        '<strong style="color:#fca5a5">· 清空所有击杀记录</strong><br>' +
-        '<strong style="color:#fca5a5">· 学院分数归零</strong><br>' +
-        '此操作不可撤销。'
-        : '将开始活动：<br>' +
-        '· 所有参与者重置为「存活」<br>' +
-        '· 生成新代码与击杀环（避免同 House 互为目标）<br>' +
-        '· 学院分数归零';
-
-    const label = isRestart ? '开始新活动' : '开始活动';
+        ? t('overview.startConfirmRestart')
+        : t('overview.startConfirmDraft');
+    const label = isRestart ? t('overview.startNewBtn') : t('overview.startBtn');
 
     const ok = await confirmDialog({
         title: label,
@@ -368,139 +343,121 @@ async function handleStart(btn) {
         confirmText: label,
         danger: true,
         requireInput: {
-            label: `请输入「${label}」以确认`,
+            label: t('overview.startInputLabel', { label }),
             value: label,
             placeholder: label,
         },
     });
     if (!ok) return;
 
-    setLoading(btn, true, '开始中...');
+    setLoading(btn, true, t('common.loading'));
 
-    // 第一次尝试：严格模式（避免同 House）
-    let { data, error } = await supabase.rpc('admin_start_event', {
-        p_strict_house: true,
-    });
+    let { data, error } = await supabase.rpc('admin_start_event', { p_strict_house: true });
 
-    // 无解 → 询问是否忽略规则
     if (!error && data?.error === 'cannot_avoid_same_house') {
         setLoading(btn, false);
-
         const ignoreOk = await confirmDialog({
-            title: '无法避免同 House 互为目标',
-            message:
-                `最大的学院「<strong>${escapeHtml(data.max_house_name || '?')}</strong>」有 ` +
-                `<strong>${data.max_count}</strong> 人，总人数 <strong>${data.total}</strong> 人。<br><br>` +
-                `当一个学院的人数超过总人数一半时，环上必然会出现两个同学院的人相邻。<br>` +
-                `是否忽略这条规则，按普通随机生成？`,
-            confirmText: '忽略规则，生成环',
-            cancelText: '取消',
+            title: t('overview.cannotAvoidHouse'),
+            message: t('overview.cannotAvoidHouseMsg', {
+                name: escapeHtml(data.max_house_name || '?'),
+                count: data.max_count,
+                total: data.total,
+            }),
+            confirmText: t('overview.ignoreHouseRule'),
+            cancelText: t('common.cancel'),
             danger: false,
         });
-
         if (!ignoreOk) return;
-
-        setLoading(btn, true, '开始中...');
-        ({ data, error } = await supabase.rpc('admin_start_event', {
-            p_strict_house: false,
-        }));
+        setLoading(btn, true, t('common.loading'));
+        ({ data, error } = await supabase.rpc('admin_start_event', { p_strict_house: false }));
     }
 
     setLoading(btn, false);
 
     if (error || data?.error) {
-        const errMap = {
-            not_admin: '你不是管理员',
-            no_event: '没有事件',
-            not_enough_participants: '参与者不足 2 人',
-        };
-        showToast('开始失败：' + (errMap[data?.error] || error?.message || data?.error), 'error');
+        const msg = errKeyToText(data?.error) || error?.message || data?.error || '';
+        showToast(t('overview.startFailed', { msg }), 'error');
         return;
     }
-
-    const suffix = data?.strict_house ? '（已避免同 House）' : '（未启用同 House 规则）';
-    showToast(`活动已开始，共 ${data?.count ?? '?'} 人${suffix}`, 'success');
+    const suffix = data?.strict_house
+        ? t('overview.startSuffixStrict')
+        : t('overview.startSuffixLoose');
+    showToast(t('overview.startSuccess', { n: data?.count ?? '?', suffix }), 'success');
     loadOverview();
 }
 
 async function handleReshuffle(btn) {
     const ok = await confirmDialog({
-        title: '重新打乱存活者',
-        message: '将只对当前存活者重新生成击杀环，不影响已淘汰者，学院分保持不变。',
-        confirmText: '确认打乱',
+        title: t('overview.reshuffleConfirmText'),
+        message: t('overview.reshuffleConfirm'),
+        confirmText: t('overview.reshuffleConfirmText'),
         danger: false,
     });
     if (!ok) return;
-
-    setLoading(btn, true, '打乱中...');
+    setLoading(btn, true, t('common.loading'));
     const { data, error } = await supabase.rpc('admin_reshuffle_alive');
     setLoading(btn, false);
-
     if (error || data?.error) {
-        showToast('打乱失败：' + (error?.message || data?.error), 'error');
+        showToast(t('overview.reshuffleFailed', { msg: error?.message || data?.error }), 'error');
         return;
     }
-    showToast(`已打乱 ${data?.alive_count ?? '?'} 名存活者`, 'success');
+    showToast(t('overview.reshuffleSuccess', { n: data?.alive_count ?? '?' }), 'success');
     loadOverview();
 }
 
 async function handlePause(btn) {
     const ok = await confirmDialog({
-        title: '暂停活动',
-        message: '暂停期间所有击杀将被冻结，参与者仍可查看自己的目标。',
-        confirmText: '暂停',
+        title: t('overview.pauseConfirmText'),
+        message: t('overview.pauseConfirm'),
+        confirmText: t('overview.pauseConfirmText'),
         danger: false,
     });
     if (!ok) return;
-
-    setLoading(btn, true, '暂停中...');
+    setLoading(btn, true, t('common.loading'));
     const { data, error } = await supabase.rpc('admin_pause_event');
     setLoading(btn, false);
-
     if (error || data?.error) {
-        showToast('暂停失败：' + (error?.message || data?.error), 'error');
+        showToast(t('overview.pauseFailed', { msg: error?.message || data?.error }), 'error');
         return;
     }
-    showToast('活动已暂停', 'success');
+    showToast(t('overview.pauseSuccess'), 'success');
     loadOverview();
 }
 
 async function handleResume(btn) {
-    setLoading(btn, true, '继续中...');
+    setLoading(btn, true, t('common.loading'));
     const { data, error } = await supabase.rpc('admin_resume_event');
     setLoading(btn, false);
-
     if (error || data?.error) {
-        showToast('继续失败：' + (error?.message || data?.error), 'error');
+        showToast(t('overview.resumeFailed', { msg: error?.message || data?.error }), 'error');
         return;
     }
-    showToast('活动已继续', 'success');
+    showToast(t('overview.resumeSuccess'), 'success');
     loadOverview();
 }
 
 async function handleEnd(btn) {
+    const endText = t('overview.endConfirmText');
     const ok = await confirmDialog({
-        title: '结束活动',
-        message: '将停止所有击杀、结算赢家。此操作不可撤销。',
-        confirmText: '结束活动',
+        title: endText,
+        message: t('overview.endConfirm'),
+        confirmText: endText,
         danger: true,
         requireInput: {
-            label: '请输入「结束活动」以确认',
-            value: '结束活动',
-            placeholder: '结束活动',
+            label: t('overview.endInputLabel'),
+            value: endText,
+            placeholder: endText,
         },
     });
     if (!ok) return;
-
-    setLoading(btn, true, '结束中...');
-    const { data, error } = await supabase.rpc('admin_end_event', { p_confirm: '结束活动' });
+    setLoading(btn, true, t('common.loading'));
+    const { data, error } = await supabase.rpc('admin_end_event', { p_confirm: endText });
     setLoading(btn, false);
-
     if (error || data?.error) {
-        showToast('结束失败：' + (error?.message || data?.error), 'error');
+        showToast(t('overview.endFailed', { msg: error?.message || data?.error }), 'error');
         return;
     }
-    showToast('活动已结束', 'success');
+    showToast(t('overview.endSuccess'), 'success');
     loadOverview();
 }
 
@@ -509,10 +466,10 @@ async function saveEventConfig(btn) {
     const dayRaw = qs('event-day')?.value;
     const day = parseInt(dayRaw, 10);
 
-    if (!name) { showToast('请填写事件名称', 'error'); return; }
-    if (!day || day < 1 || day > 5) { showToast('天数需在 1-5 之间', 'error'); return; }
+    if (!name) { showToast(t('overview.enterEventName'), 'error'); return; }
+    if (!day || day < 1 || day > 5) { showToast(t('overview.dayRange'), 'error'); return; }
 
-    setLoading(btn, true, '保存中...');
+    setLoading(btn, true, t('common.saving'));
     const { data, error } = await supabase.rpc('admin_update_event', {
         p_name: name,
         p_current_day: day,
@@ -520,23 +477,28 @@ async function saveEventConfig(btn) {
     setLoading(btn, false);
 
     if (error || data?.error) {
-        showToast('保存失败：' + (error?.message || data?.error), 'error');
+        showToast(t('overview.saveFailed', { msg: error?.message || data?.error }), 'error');
         return;
     }
-
-    showToast('已保存', 'success');
+    showToast(t('common.save') + ' ✓', 'success');
     const hintEl = qs('event-save-hint');
     if (hintEl) {
-        hintEl.textContent = '已保存 ✓';
+        hintEl.textContent = t('overview.savedHint');
         setTimeout(() => { hintEl.textContent = ''; }, 2000);
     }
     loadOverview();
 }
 
+function errKeyToText(code) {
+    if (!code) return '';
+    const key = 'error.' + code;
+    const val = t(key);
+    return val === key ? '' : val;
+}
+
 /* ============================================================
    全局事件委托
    ============================================================ */
-
 function bindGlobalDelegation() {
     document.addEventListener('click', (e) => {
         const gotoBtn = e.target.closest('[data-goto]');
@@ -545,7 +507,6 @@ function bindGlobalDelegation() {
             goto(gotoBtn.dataset.goto);
             return;
         }
-
         const actionBtn = e.target.closest('[data-action]');
         if (actionBtn) {
             const action = actionBtn.dataset.action;
@@ -557,73 +518,9 @@ function bindGlobalDelegation() {
         }
     });
 
-    // 接收子模块派发的刷新事件
     window.addEventListener('ninjatag:refresh-overview', () => {
         if (currentTab === 'overview') loadOverview();
     });
-}
-
-/* ============================================================
-   启动
-   ============================================================ */
-
-async function boot() {
-    const session = await requireLogin();
-    if (!session) return;
-
-    const isAdmin = await checkIsAdmin();
-    if (!isAdmin) {
-        showToast('你不是管理员，无权访问。', 'error');
-        setTimeout(() => { window.location.href = 'index.html'; }, 1500);
-        return;
-    }
-
-    const user = await getUser();
-    state.userEmail = user?.email || '';
-    const userLine = qs('sidebar-user');
-    if (userLine) userLine.textContent = state.userEmail || '已登录';
-
-    // 导航
-    qsa('[data-nav]').forEach(btn => {
-        btn.addEventListener('click', () => goto(btn.dataset.nav));
-    });
-
-    // 退出
-    qs('nav-logout')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        signOut();
-    });
-
-    // Modal 遮罩
-    [
-        'edit-participant-modal',
-        'import-modal',
-        'kill-reason-modal',
-        'confirm-modal',
-        'bulk-edit-modal',
-        'edit-college-modal',
-    ].forEach(bindModalBackdrop);
-
-    // 保存事件配置
-    qs('btn-save-event')?.addEventListener('click', (e) => saveEventConfig(e.currentTarget));
-
-    // 全局委托
-    bindGlobalDelegation();
-
-    // 移动端「更多」抽屉
-    initMoreDrawer();
-
-    // 初始化各 Tab 模块（只绑定一次事件）
-    initParticipants();
-    initChain();
-    initRecords();
-    initColleges();
-    initRules();
-    initAdmins();
-    initSettings();
-
-    // 首次渲染
-    goto('overview');
 }
 
 /* ============================================================
@@ -652,16 +549,79 @@ function initMoreDrawer() {
         if (drawer.classList.contains('is-open')) closeMoreDrawer();
         else openMoreDrawer();
     });
-    // 点击遮罩关闭
     drawer.querySelectorAll('[data-more-close]').forEach(el => {
         el.addEventListener('click', closeMoreDrawer);
     });
-    // Esc 关闭
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && drawer.classList.contains('is-open')) {
             closeMoreDrawer();
         }
     });
+}
+
+/* ============================================================
+   启动
+   ============================================================ */
+async function boot() {
+    applyI18n();
+    mountLanguageSwitcher('sidebar-lang-switch');
+    mountLanguageSwitcher('drawer-lang-switch');
+
+    // 语言切换：重绘静态文本 + 各模块 i18n 刷新 + 当前 Tab
+    window.addEventListener('localechange', () => {
+        applyI18n();
+        const titleEl = qs('topbar-title');
+        if (titleEl) titleEl.textContent = t(TAB_KEYS[currentTab] || 'tab.overview');
+        // 各模块内部缓存的状态需要按新语言重绘
+        try { refreshParticipantsI18n(); } catch (_) { /* ignore */ }
+        try { refreshChainI18n(); } catch (_) { /* ignore */ }
+        try { refreshRecordsI18n(); } catch (_) { /* ignore */ }
+        try { refreshMiscI18n(); } catch (_) { /* ignore */ }
+        // 概览页和当前 Tab 重新拉取数据（保险起见）
+        if (currentTab === 'overview') loadOverview();
+    });
+
+    const session = await requireLogin();
+    if (!session) return;
+
+    const isAdmin = await checkIsAdmin();
+    if (!isAdmin) {
+        showToast(t('admin.notAdmin'), 'error');
+        setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+        return;
+    }
+
+    const user = await getUser();
+    state.userEmail = user?.email || '';
+    const userLine = qs('sidebar-user');
+    if (userLine) userLine.textContent = state.userEmail || '—';
+
+    qsa('[data-nav]').forEach(btn => {
+        btn.addEventListener('click', () => goto(btn.dataset.nav));
+    });
+
+    qs('nav-logout')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        signOut();
+    });
+
+    ['edit-participant-modal', 'import-modal', 'kill-reason-modal', 'confirm-modal',
+        'bulk-edit-modal', 'edit-college-modal'].forEach(bindModalBackdrop);
+
+    qs('btn-save-event')?.addEventListener('click', (e) => saveEventConfig(e.currentTarget));
+
+    bindGlobalDelegation();
+    initMoreDrawer();
+
+    initParticipants();
+    initChain();
+    initRecords();
+    initColleges();
+    initRules();
+    initAdmins();
+    initSettings();
+
+    goto('overview');
 }
 
 document.addEventListener('DOMContentLoaded', boot);

@@ -1,5 +1,6 @@
 // js/auth.js
 import { supabase } from './supabase.js';
+import { t } from './i18n.js';
 
 export async function getSession() {
   const { data } = await supabase.auth.getSession();
@@ -47,10 +48,7 @@ export async function routeAfterLogin() {
     window.location.href = 'admin.html';
     return;
   }
-
-  // 非管理员：拒绝登录
-  const { supabase } = await import('./supabase.js');
   await supabase.auth.signOut();
-  alert('仅管理员可以登录。');
+  alert(t('login.adminOnly'));
   window.location.href = 'index.html';
 }

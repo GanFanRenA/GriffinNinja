@@ -2,8 +2,15 @@
 import { supabase } from './supabase.js';
 import { showMessage, setLoading } from './utils.js';
 import { routeAfterLogin } from './auth.js';
+import { t, initI18n, applyI18n, mountLanguageSwitcher } from './i18n.js';
+
+initI18n();
 
 async function init() {
+    applyI18n();
+    mountLanguageSwitcher('lang-switch');
+    window.addEventListener('localechange', () => applyI18n());
+
     const loadingEl = document.getElementById('loading');
     const stepEl = document.getElementById('step-password');
 
@@ -13,8 +20,8 @@ async function init() {
     const { data: { session }, error } = await supabase.auth.getSession();
 
     if (error || !session) {
-        loadingEl.innerHTML =
-            '链接无效或已过期。请重新 <a href="register.html">注册</a>。';
+        loadingEl.innerHTML = t('setpwd.invalidLink') +
+            ' <a href="register.html" data-i18n="login.registerLink">' + t('login.registerLink') + '</a>';
         return;
     }
 
@@ -26,9 +33,11 @@ async function init() {
 
     const btn = document.getElementById('btn-set');
     btn.addEventListener('click', () => handleSetPassword(btn));
-
     document.getElementById('password2')?.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); btn.click(); }
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            btn.click();
+        }
     });
 }
 
@@ -37,25 +46,25 @@ async function handleSetPassword(btn) {
     const pwd2 = document.getElementById('password2').value;
 
     if (!pwd || pwd.length < 6) {
-        showMessage('密码至少 6 位', 'error');
+        showMessage(t('setpwd.tooShort'), 'error');
         return;
     }
     if (pwd !== pwd2) {
-        showMessage('两次输入的密码不一致', 'error');
+        showMessage(t('setpwd.mismatch'), 'error');
         return;
     }
 
-    setLoading(btn, true, '设置中...');
+    setLoading(btn, true, t('setpwd.setting'));
 
     const { error } = await supabase.auth.updateUser({ password: pwd });
 
     if (error) {
-        showMessage('设置失败：' + error.message, 'error');
+        showMessage(t('setpwd.setFailed', { msg: error.message }), 'error');
         setLoading(btn, false);
         return;
     }
 
-    showMessage('密码已设置，正在进入后台...', 'success');
+    showMessage(t('setpwd.success'), 'success');
     setTimeout(() => routeAfterLogin(), 700);
 }
 

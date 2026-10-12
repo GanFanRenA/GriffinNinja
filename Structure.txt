@@ -540,6 +540,8 @@ RPC 函数清单，以及角色与权限划分。
 - 自动备份
 - 审计日志前端接入（后端已有 RPC）
 
+================================================================ 十、国际化（i18n） ================================================================ - 新增 js/i18n.js：字典、t(key, params)、initI18n()、setLocale()、 applyI18n(root)、mountLanguageSwitcher(target)。 - HTML 静态文本通过 data-i18n / data-i18n-html / data-i18n-placeholder / data-i18n-title / data-i18n-aria-label 标注。 - JS 动态文本统一走 t('namespace.key', params)。 - 语言切换器挂载点： - 认证页 / 公共页：<div id="lang-switch"> 在 site-header 内 - 后台：sidebar-lang-switch（侧边栏底部） - drawer-lang-switch（移动端「更多」抽屉内） - 语言优先级：URL ?lang= > localStorage ninjatag.locale > navigator.language > 默认 zh-CN。 - 切换语言会派发 localechange 事件，各模块订阅后重绘： - public.js → loadPublicHome() - admin.js → refreshParticipantsI18n / refreshChainI18n / refreshRecordsI18n / refreshMiscI18n + 概览刷新 - 数据库内容（姓名、邮箱、学院名、活动名、规则内容）不参与 i18n。 - 首页板块开关名称通过 SECTION_LABEL_KEYS 映射到 i18n key，回退到 home_sections.label。
+
 ================================================================
 文档结束
 ================================================================

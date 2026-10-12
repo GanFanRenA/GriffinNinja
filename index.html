@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>NinjaTag</title>
+  <title data-i18n="public.pageTitle">NinjaTag</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -12,56 +12,50 @@
   <header class="site-header">
     <h1>NinjaTag</h1>
     <nav>
-      <a href="login.html" id="nav-login">登录</a>
-      <a href="admin.html" id="nav-admin" style="display:none">后台</a>
-      <a href="#" id="nav-logout" style="display:none">退出</a>
+      <a href="login.html" id="nav-login" data-i18n="header.login">登录</a>
+      <a href="admin.html" id="nav-admin" style="display:none" data-i18n="header.admin">后台</a>
+      <a href="#" id="nav-logout" style="display:none" data-i18n="header.logout">退出</a>
+      <div id="lang-switch"></div>
     </nav>
   </header>
-
   <main class="container">
     <!-- 活动状态 -->
     <section id="event-status" class="card" data-section="event">
-      <h2>活动状态</h2>
-      <p id="status-text">加载中...</p>
+      <h2 data-i18n="public.eventTitle">活动状态</h2>
+      <p id="status-text" data-i18n="common.loading">加载中...</p>
       <p id="day-text" class="hint"></p>
     </section>
-
     <!-- 阵营分数 -->
     <section id="colleges" class="card" data-section="colleges">
-      <h2>阵营分数</h2>
+      <h2 data-i18n="public.collegesTitle">阵营分数</h2>
       <div id="colleges-list" class="colleges-grid"></div>
     </section>
-
     <!-- 人数 -->
     <section id="counts" class="card" data-section="counts">
-      <h2>人数</h2>
+      <h2 data-i18n="public.countsTitle">人数</h2>
       <p>
-        存活：<strong id="alive-count">-</strong>
+        <span data-i18n="public.aliveLabel">存活：</span><strong id="alive-count">-</strong>
         <span class="muted">｜</span>
-        淘汰：<strong id="eliminated-count">-</strong>
+        <span data-i18n="public.eliminatedLabel">淘汰：</span><strong id="eliminated-count">-</strong>
       </p>
     </section>
-
     <!-- 今日规则 -->
     <section id="today-rule" class="card" data-section="today_rule">
-      <h2>今日规则</h2>
+      <h2 data-i18n="public.todayRuleTitle">今日规则</h2>
       <p id="rule-title" style="font-weight:600"></p>
       <p id="rule-content" class="hint" style="white-space:pre-wrap;line-height:1.6"></p>
     </section>
-
     <!-- 存活墙 -->
     <section id="alive-wall" class="card" data-section="alive_wall">
-      <h2>存活墙</h2>
+      <h2 data-i18n="public.aliveWallTitle">存活墙</h2>
       <div id="alive-wall-list" class="wall-grid"></div>
     </section>
-
     <!-- 最终赢家 -->
     <section id="winner" class="card" data-section="winner" style="display:none">
-      <h2>最终赢家</h2>
+      <h2 data-i18n="public.winnerTitle">最终赢家</h2>
       <div id="winner-content"></div>
     </section>
   </main>
-
   <script type="module" src="js/public.js"></script>
 </body>
 

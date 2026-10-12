@@ -3,32 +3,27 @@ window.location.href = 'index.html';
 
 import { supabase } from './supabase.js';
 import { requireLogin, signOut } from './auth.js';
-import { showMessage, setLoading, escapeHtml } from './utils.js';
+import { showMessage, setLoading } from './utils.js';
+import { t, initI18n, applyI18n, mountLanguageSwitcher } from './i18n.js';
+
+initI18n();
 
 async function loadProfile() {
   const { data, error } = await supabase.rpc('get_my_profile');
-
   if (error) {
     console.error(error);
-    document.getElementById('loading').textContent = '加载失败：' + error.message;
+    document.getElementById('loading').textContent = t('identity.loadFailed', { msg: error.message });
     return;
   }
-
   if (!data || data.error) {
-    document.getElementById('loading').textContent =
-      '未找到你的参与者记录，请联系管理员。';
+    document.getElementById('loading').textContent = t('identity.notFound');
     return;
   }
-
   const me = data.me;
-
   if (me.is_confirmed) {
-    // 已确认，直接进个人页
     window.location.href = 'me.html';
     return;
   }
-
-  // 渲染信息
   document.getElementById('loading').style.display = 'none';
   document.getElementById('profile').style.display = 'block';
   document.getElementById('name').textContent = me.name || '-';
@@ -40,63 +35,54 @@ async function loadProfile() {
 }
 
 async function confirmIdentity(btn) {
-  setLoading(btn, true, '确认中...');
+  setLoading(btn, true, t('identity.confirming'));
   const { data, error } = await supabase.rpc('confirm_identity');
   setLoading(btn, false);
-
   if (error) {
-    showMessage('确认失败：' + error.message, 'error');
+    showMessage(t('identity.confirmFailed', { msg: error.message }), 'error');
     return;
   }
   if (data?.error) {
-    showMessage('确认失败：' + data.error, 'error');
+    showMessage(t('identity.confirmFailed', { msg: data.error }), 'error');
     return;
   }
-
-  showMessage('身份已确认，正在进入个人页...', 'success');
+  showMessage(t('identity.confirmed'), 'success');
   setTimeout(() => window.location.href = 'me.html', 800);
 }
 
 async function submitReject(note) {
   if (!note.trim()) {
-    showMessage('请填写说明', 'error');
+    showMessage(t('identity.enterNote'), 'error');
     return;
   }
-  const { data, error } = await supabase.rpc('report_identity_issue', {
-    p_note: note.trim(),
-  });
-
+  const { data, error } = await supabase.rpc('report_identity_issue', { p_note: note.trim() });
   if (error || data?.error) {
-    showMessage('提交失败：' + (error?.message || data?.error), 'error');
+    showMessage(t('identity.submitFailed', { msg: error?.message || data?.error }), 'error');
     return;
   }
-
-  showMessage('已通知管理员，请等待处理。', 'success');
-  setTimeout(async () => {
-    await signOut();
-  }, 1500);
+  showMessage(t('identity.notified'), 'success');
+  setTimeout(async () => { await signOut(); }, 1500);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  applyI18n();
+  mountLanguageSwitcher('lang-switch');
+  window.addEventListener('localechange', () => applyI18n());
+
   const session = await requireLogin();
   if (!session) return;
-
   await loadProfile();
-
   document.getElementById('nav-logout')?.addEventListener('click', (e) => {
     e.preventDefault();
     signOut();
   });
-
   document.getElementById('btn-confirm').addEventListener('click', (e) => {
     confirmIdentity(e.target);
   });
-
   document.getElementById('btn-reject').addEventListener('click', () => {
     document.getElementById('reject-form').style.display = 'block';
     document.getElementById('btn-reject').style.display = 'none';
   });
-
   document.getElementById('btn-submit-reject').addEventListener('click', () => {
     const note = document.getElementById('reject-note').value;
     submitReject(note);

@@ -1,10 +1,10 @@
 // js/utils.js
 // 通用工具：转义、时间、Toast、Modal、确认对话框、骨架屏、空状态
+import { t, getLocale } from './i18n.js';
 
 /* ============================================================
    转义 / 格式化
    ============================================================ */
-
 export function escapeHtml(str) {
   if (str === null || str === undefined) return '';
   return String(str)
@@ -15,41 +15,44 @@ export function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
-export function formatTime(ts) {
+export function formatTime(ts, locale) {
   if (!ts) return '';
   const d = new Date(ts);
   if (Number.isNaN(d.getTime())) return '';
+  const loc = locale || getLocale();
+  if (loc === 'en') {
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
   const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-    `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export function formatRelative(ts) {
   if (!ts) return '';
   const diff = Date.now() - new Date(ts).getTime();
   const sec = Math.floor(diff / 1000);
-  if (sec < 60) return '刚刚';
+  if (sec < 60) return t('time.justNow');
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min} 分钟前`;
+  if (min < 60) return t('time.minutesAgo', { n: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} 小时前`;
+  if (hr < 24) return t('time.hoursAgo', { n: hr });
   const day = Math.floor(hr / 24);
-  if (day < 7) return `${day} 天前`;
+  if (day < 7) return t('time.daysAgo', { n: day });
   return formatTime(ts);
 }
 
 export function debounce(fn, wait = 250) {
-  let t = null;
+  let timer = null;
   return function debounced(...args) {
-    clearTimeout(t);
-    t = setTimeout(() => fn.apply(this, args), wait);
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), wait);
   };
 }
 
 /* ============================================================
    Toast
    ============================================================ */
-
 const TOAST_ICONS = {
   success: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
   error: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17h.01"/></svg>',
@@ -71,21 +74,17 @@ function getToastContainer() {
 export function showToast(msg, type = 'info', duration = 3000) {
   if (!msg) return;
   const container = getToastContainer();
-
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   toast.innerHTML = `
     <span class="toast-icon">${TOAST_ICONS[type] || TOAST_ICONS.info}</span>
     <span class="toast-body">${escapeHtml(msg)}</span>
   `;
-
   container.appendChild(toast);
-
   const remove = () => {
     toast.classList.add('leaving');
     setTimeout(() => toast.remove(), 200);
   };
-
   const timer = setTimeout(remove, duration);
   toast.addEventListener('click', () => {
     clearTimeout(timer);
@@ -103,14 +102,13 @@ export function hideMessage() { /* no-op */ }
 /* ============================================================
    按钮 loading
    ============================================================ */
-
-export function setLoading(btn, loading, text = '处理中...') {
+export function setLoading(btn, loading, text) {
   if (!btn) return;
-
   if (loading) {
     if (!btn.dataset.originalHtml) btn.dataset.originalHtml = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:-2px;margin-right:6px"></span>${escapeHtml(text)}`;
+    const label = text || t('common.loading');
+    btn.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:-2px;margin-right:6px"></span>${escapeHtml(label)}`;
     if (!document.getElementById('spin-keyframe')) {
       const style = document.createElement('style');
       style.id = 'spin-keyframe';
@@ -129,7 +127,6 @@ export function setLoading(btn, loading, text = '处理中...') {
 /* ============================================================
    Modal
    ============================================================ */
-
 export function openModal(id) {
   const el = typeof id === 'string' ? document.getElementById(id) : id;
   if (!el) return;
@@ -158,13 +155,12 @@ export function bindModalBackdrop(id) {
 /* ============================================================
    通用确认对话框
    ============================================================ */
-
 export function confirmDialog(opts = {}) {
   const {
-    title = '确认操作',
+    title = t('common.confirmTitle'),
     message = '',
-    confirmText = '确认',
-    cancelText = '取消',
+    confirmText = t('common.confirm'),
+    cancelText = t('common.cancel'),
     danger = true,
     requireInput = null,
   } = opts;
@@ -189,7 +185,7 @@ export function confirmDialog(opts = {}) {
 
     if (requireInput) {
       inputWrap.style.display = 'block';
-      inputLabel.textContent = requireInput.label || '请输入确认';
+      inputLabel.textContent = requireInput.label || t('common.confirm');
       inputEl.value = '';
       inputEl.placeholder = requireInput.placeholder || '';
     } else {
@@ -227,9 +223,7 @@ export function confirmDialog(opts = {}) {
     };
 
     const onCancel = () => finish(false);
-
     const onBackdrop = (e) => { if (e.target === overlay) finish(false); };
-
     const onKey = (e) => {
       if (e.key === 'Escape') finish(false);
       if (e.key === 'Enter' && (!requireInput || document.activeElement === inputEl)) {
@@ -249,7 +243,6 @@ export function confirmDialog(opts = {}) {
 /* ============================================================
    骨架屏
    ============================================================ */
-
 export function skeletonRows(count = 3, cols = 3) {
   const widths = ['w-40', 'w-20', 'w-10'];
   let html = '';
@@ -280,7 +273,6 @@ export function skeletonTable(count = 4) {
 /* ============================================================
    空状态
    ============================================================ */
-
 const EMPTY_ICONS = {
   default: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 10h8M8 14h5"/></svg>',
   user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>',
@@ -292,14 +284,12 @@ const EMPTY_ICONS = {
 export function emptyState(opts = {}) {
   const {
     icon = 'default',
-    title = '暂无数据',
+    title = t('empty.defaultTitle'),
     desc = '',
     actionText = '',
     actionId = '',
   } = opts;
-
   const svg = EMPTY_ICONS[icon] || EMPTY_ICONS.default;
-
   return `
     <div class="empty">
       ${svg}
@@ -313,9 +303,13 @@ export function emptyState(opts = {}) {
 /* ============================================================
    杂项
    ============================================================ */
+export function qs(id) {
+  return document.getElementById(id);
+}
 
-export function qs(id) { return document.getElementById(id); }
-export function qsa(sel, root = document) { return Array.from(root.querySelectorAll(sel)); }
+export function qsa(sel, root = document) {
+  return Array.from(root.querySelectorAll(sel));
+}
 
 export function copyToClipboard(text) {
   if (navigator.clipboard && window.isSecureContext) {

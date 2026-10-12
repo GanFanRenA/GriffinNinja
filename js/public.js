@@ -1,12 +1,13 @@
 // js/public.js
 // 公共主页：活动状态、阵营分、人数、今日规则、存活墙、最终赢家
-
 import { supabase } from './supabase.js';
 import { getSession, signOut } from './auth.js';
 import { qs, escapeHtml, formatTime, emptyState } from './utils.js';
+import { t, initI18n, applyI18n, mountLanguageSwitcher } from './i18n.js';
+
+initI18n();
 
 const POLL_INTERVAL = 5000;
-
 let pollTimer = null;
 let isAdminUser = false;
 let sectionVisibility = {};
@@ -19,30 +20,26 @@ let winnerStatsEventKey = null;
 /* ============================================================
    可见性
    ============================================================ */
-
 async function initVisibility() {
   const session = await getSession();
   if (session) {
     const { data } = await supabase.rpc('is_admin');
     isAdminUser = data === true;
   }
-
   const { data: vis } = await supabase.rpc('get_home_section_visibility');
   sectionVisibility = (vis && typeof vis === 'object') ? vis : {};
-
   applySectionVisibility();
 }
 
 function applySectionVisibility() {
   document.querySelectorAll('[data-section]').forEach(el => {
     const key = el.dataset.section;
-    if (key === 'winner') return; // winner 由 renderWinner 处理
+    if (key === 'winner') return;
     const visible = sectionVisibility[key] !== false;
     el.style.display = (isAdminUser || visible) ? '' : 'none';
   });
 }
 
-// 判断某个子开关是否可见
 function isSubVisible(key) {
   if (isAdminUser) return true;
   return sectionVisibility[key] !== false;
@@ -51,23 +48,19 @@ function isSubVisible(key) {
 /* ============================================================
    加载数据
    ============================================================ */
-
 async function loadPublicHome() {
   const { data, error } = await supabase.rpc('get_public_home');
-
   if (error) {
     console.error('加载公共主页失败:', error);
     const statusEl = qs('status-text');
-    if (statusEl) statusEl.textContent = '加载失败';
+    if (statusEl) statusEl.textContent = t('public.loadFailed');
     return;
   }
-
   if (!data || !data.event) {
     const statusEl = qs('status-text');
-    if (statusEl) statusEl.textContent = '活动尚未创建';
+    if (statusEl) statusEl.textContent = t('public.noEvent');
     return;
   }
-
   renderEvent(data);
   renderColleges(data.colleges || []);
   renderCounts(data);
@@ -79,23 +72,30 @@ async function loadPublicHome() {
 /* ============================================================
    渲染：状态 / 阵营 / 人数 / 规则 / 存活墙
    ============================================================ */
-
 function renderEvent(data) {
-  const statusMap = { draft: '未开始', active: '进行中', paused: '已暂停', ended: '已结束' };
-  const badgeCls = { draft: 'badge-neutral', active: 'badge-success', paused: 'badge-warning', ended: 'badge-neutral' };
   const status = data.event.status;
-
+  const statusKey = {
+    draft: 'public.statusDraft',
+    active: 'public.statusActive',
+    paused: 'public.statusPaused',
+    ended: 'public.statusEnded',
+  };
+  const badgeCls = {
+    draft: 'badge-neutral',
+    active: 'badge-success',
+    paused: 'badge-warning',
+    ended: 'badge-neutral',
+  };
   const statusEl = qs('status-text');
   if (statusEl) {
-    statusEl.innerHTML =
-      `<span class="badge ${badgeCls[status] || 'badge-neutral'}">` +
-      `<span class="dot"></span>${escapeHtml(statusMap[status] || status)}</span>`;
+    const label = t(statusKey[status] || 'public.statusDraft');
+    statusEl.innerHTML = `<span class="badge ${badgeCls[status] || 'badge-neutral'}">` +
+      `<span class="dot"></span>${escapeHtml(label)}</span>`;
   }
-
   const dayEl = qs('day-text');
   if (dayEl) {
     dayEl.textContent = status === 'active' && data.event.current_day
-      ? `第 ${data.event.current_day} 天`
+      ? t('public.dayText', { n: data.event.current_day })
       : '';
   }
 }
@@ -103,12 +103,10 @@ function renderEvent(data) {
 function renderColleges(colleges) {
   const el = qs('colleges-list');
   if (!el) return;
-
   if (!colleges.length) {
-    el.innerHTML = emptyState({ title: '暂无阵营数据' });
+    el.innerHTML = emptyState({ title: t('public.noColleges') });
     return;
   }
-
   el.innerHTML = colleges.map(c => `
     <div class="college-card" style="border-color:${escapeHtml(c.color || '#555')}">
       <div class="college-name" style="background:${escapeHtml(c.color || '#555')}">
@@ -130,9 +128,8 @@ function renderTodayRule(rule) {
   const titleEl = qs('rule-title');
   const contentEl = qs('rule-content');
   if (!titleEl || !contentEl) return;
-
   if (!rule) {
-    titleEl.textContent = '今日无特殊规则';
+    titleEl.textContent = t('public.noRule');
     contentEl.textContent = '';
     return;
   }
@@ -143,16 +140,13 @@ function renderTodayRule(rule) {
 function renderAliveWall(list) {
   const el = qs('alive-wall-list');
   if (!el) return;
-
   const key = list.map(p => `${p.id}|${p.photo_url || ''}|${p.name}|${p.college_name || ''}`).join(',');
   if (key === lastAliveWallKey) return;
   lastAliveWallKey = key;
-
   if (!list.length) {
-    el.innerHTML = emptyState({ icon: 'user', title: '暂无存活者' });
+    el.innerHTML = emptyState({ icon: 'user', title: t('public.noAlive') });
     return;
   }
-
   el.innerHTML = list.map(p => `
     <div class="wall-item">
       <img src="${escapeHtml(p.photo_url || 'assets/placeholder.png')}"
@@ -170,18 +164,15 @@ function renderAliveWall(list) {
 /* ============================================================
    最终赢家：4 个独立奖项
    ============================================================ */
-
 async function loadWinnerStats(eventKey) {
   if (winnerStatsCache && winnerStatsEventKey === eventKey) {
     return winnerStatsCache;
   }
-
   const { data, error } = await supabase.rpc('get_winner_stats');
   if (error || data?.error) {
     console.error('get_winner_stats 失败:', error || data?.error);
     return null;
   }
-
   winnerStatsCache = data;
   winnerStatsEventKey = eventKey;
   return data;
@@ -190,39 +181,30 @@ async function loadWinnerStats(eventKey) {
 async function renderWinner(data) {
   const el = qs('winner');
   if (!el) return;
-
-  // 只在活动结束时显示
   if (data.event.status !== 'ended') {
     el.style.display = 'none';
     winnerStatsCache = null;
     winnerStatsEventKey = null;
     return;
   }
-
-  // 总开关
   if (!isAdminUser && sectionVisibility['winner'] === false) {
     el.style.display = 'none';
     return;
   }
-
   el.style.display = '';
-
   const eventKey = data.event.id || 'default';
   const stats = await loadWinnerStats(eventKey);
   const contentEl = qs('winner-content');
   if (!contentEl) return;
-
   if (!stats) {
-    contentEl.innerHTML = '<p class="hint">暂无赢家数据。</p>';
+    contentEl.innerHTML = `<p class="hint">${escapeHtml(t('public.noWinnerData'))}</p>`;
     return;
   }
-
   const parts = [];
 
-  // 1. 个人赢家
   if (isSubVisible('winner_personal') && stats.personal) {
     parts.push(winnerCard({
-      label: '个人赢家',
+      label: t('public.winnerPersonal'),
       icon: '🏆',
       name: stats.personal.name,
       photo: stats.personal.photo_url,
@@ -230,35 +212,29 @@ async function renderWinner(data) {
       color: stats.personal.color || '',
     }));
   }
-
-  // 2. 阵营赢家
   if (isSubVisible('winner_college') && stats.college) {
     parts.push(winnerCard({
-      label: '阵营赢家',
+      label: t('public.winnerCollege'),
       icon: '🛡️',
       name: stats.college.name,
       photo: null,
-      sub: `${stats.college.score ?? 0} 分`,
+      sub: t('public.collegeScore', { n: stats.college.score ?? 0 }),
       color: stats.college.color || '',
     }));
   }
-
-  // 3. 最多淘汰
   if (isSubVisible('winner_most_kills') && stats.most_kills) {
     parts.push(winnerCard({
-      label: '最多淘汰',
+      label: t('public.winnerMostKills'),
       icon: '⚔️',
       name: stats.most_kills.name,
       photo: stats.most_kills.photo_url,
-      sub: `${stats.most_kills.college_name || ''} · ${stats.most_kills.kill_count} 次击杀`,
+      sub: `${stats.most_kills.college_name || ''} · ${t('public.killCount', { n: stats.most_kills.kill_count })}`,
       color: stats.most_kills.color || '',
     }));
   }
-
-  // 4. 最快阵亡
   if (isSubVisible('winner_fastest_death') && stats.fastest_death) {
     parts.push(winnerCard({
-      label: '最快阵亡',
+      label: t('public.winnerFastestDeath'),
       icon: '💀',
       name: stats.fastest_death.name,
       photo: stats.fastest_death.photo_url,
@@ -269,7 +245,7 @@ async function renderWinner(data) {
 
   contentEl.innerHTML = parts.length
     ? parts.join('')
-    : '<p class="hint">未开启任何奖项显示。</p>';
+    : `<p class="hint">${escapeHtml(t('public.noWinnerEnabled'))}</p>`;
 }
 
 function winnerCard({ label, icon, name, photo, sub, color }) {
@@ -277,7 +253,6 @@ function winnerCard({ label, icon, name, photo, sub, color }) {
     ? `<img src="${escapeHtml(photo)}" alt="${escapeHtml(name)}"
             onerror="this.onerror=null;this.src='assets/placeholder.png'">`
     : `<div class="winner-emoji">${icon}</div>`;
-
   return `
     <div class="winner-card">
       ${imgHtml}
@@ -293,14 +268,12 @@ function winnerCard({ label, icon, name, photo, sub, color }) {
 /* ============================================================
    导航
    ============================================================ */
-
 async function updateNav() {
   const session = await getSession();
   const navLogin = qs('nav-login');
   const navAdmin = qs('nav-admin');
   const navLogout = qs('nav-logout');
   if (!navLogin || !navAdmin || !navLogout) return;
-
   if (session) {
     const { data } = await supabase.rpc('is_admin');
     if (data === true) {
@@ -323,7 +296,6 @@ async function updateNav() {
 /* ============================================================
    轮询 / 启动
    ============================================================ */
-
 function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(loadPublicHome, POLL_INTERVAL);
@@ -332,7 +304,10 @@ function startPolling() {
 function bindVisibilityChange() {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
     } else {
       loadPublicHome();
       startPolling();
@@ -341,6 +316,17 @@ function bindVisibilityChange() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  applyI18n();
+  mountLanguageSwitcher('lang-switch');
+
+  window.addEventListener('localechange', () => {
+    applyI18n();
+    lastAliveWallKey = ''; // 强制重绘存活墙
+    winnerStatsCache = null;
+    winnerStatsEventKey = null;
+    loadPublicHome();
+  });
+
   qs('nav-logout')?.addEventListener('click', (e) => {
     e.preventDefault();
     signOut();

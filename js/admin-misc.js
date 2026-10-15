@@ -6,7 +6,6 @@ import {
     qs, showToast, setLoading, confirmDialog, openModal, closeModal,
     escapeHtml, skeletonRows, emptyState,
 } from './utils.js';
-import { isPurpleHouse } from './public.js';
 import { t } from './i18n.js';
 
 /* ============================================================
@@ -48,7 +47,7 @@ function renderColleges() {
         return;
     }
 
-    el.innerHTML = state.colleges.filter(c => !isPurpleHouse(c)).map(c => {
+    el.innerHTML = state.colleges.map(c => {
         const scoreLabel = t('colleges.scoreUnit', { n: c.score ?? 0 });
         const peopleLabel = t('colleges.peopleUnit', { n: c.participant_count ?? 0 });
         return `

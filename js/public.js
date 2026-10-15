@@ -31,13 +31,6 @@ async function initVisibility() {
   applySectionVisibility();
 }
 
-
-function isPurpleHouse(c) {
-  return c?.is_hidden === true ||
-    String(c?.name || c?.college_name || '').trim().toLowerCase() === 'purplehouse';
-}
-
-
 function applySectionVisibility() {
   document.querySelectorAll('[data-section]').forEach(el => {
     const key = el.dataset.section;
@@ -69,7 +62,7 @@ async function loadPublicHome() {
     return;
   }
   renderEvent(data);
-  renderColleges((data.colleges || []).filter(c=>!isPurpleHouse(c)));
+  renderColleges(data.colleges || []);
   renderCounts(data);
   renderTodayRule(data.today_rule);
   renderAliveWall(data.alive_wall || []);

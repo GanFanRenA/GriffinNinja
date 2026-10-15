@@ -1,0 +1,540 @@
+/* ============================================================
+   NinjaTag · 公共首页（index.html）专属样式
+   ------------------------------------------------------------
+   - 只在本文件里写样式，index.html 内不出现 <style> 块
+   - 所有规则以 body.page-public 为前缀
+   - 其它页面（admin / login / register / set-password / me /
+     confirm）的 <body> 没有 page-public 类，因此完全不受影响
+   - style.css 未做任何改动
+   ============================================================ */
+
+/* ---------- 页面级：背景 + 基线 ---------- */
+body.page-public {
+ background:
+  radial-gradient(1200px 600px at 12% -10%, rgba(79, 140, 255, 0.10), transparent 60%),
+  radial-gradient(900px 520px at 100% 0%, rgba(124, 92, 255, 0.08), transparent 55%),
+  var(--bg);
+ min-height: 100vh;
+}
+
+/* ---------- 顶部导航 ---------- */
+body.page-public .site-header {
+ padding: 12px 22px;
+ background: rgba(20, 23, 29, 0.72);
+ backdrop-filter: saturate(140%) blur(14px);
+ -webkit-backdrop-filter: saturate(140%) blur(14px);
+ border-bottom: 1px solid var(--border);
+}
+
+body.page-public .site-header h1 {
+ display: inline-flex;
+ align-items: center;
+ gap: 10px;
+ font-size: 17px;
+ font-weight: 800;
+ color: var(--text);
+ letter-spacing: 0.02em;
+}
+
+body.page-public .site-header h1::before {
+ content: "N";
+ width: 28px;
+ height: 28px;
+ border-radius: 8px;
+ background: linear-gradient(135deg, var(--primary), #7c5cff);
+ color: #fff;
+ display: grid;
+ place-items: center;
+ font-size: 14px;
+ font-weight: 800;
+ line-height: 1;
+ box-shadow: 0 6px 18px rgba(79, 140, 255, 0.35);
+ flex-shrink: 0;
+}
+
+body.page-public .site-header nav a {
+ padding: 6px 12px;
+ font-weight: 600;
+ border-radius: var(--r-full);
+ transition: background 0.15s, color 0.15s;
+}
+
+body.page-public .site-header nav a:hover {
+ background: var(--primary-soft);
+ color: var(--primary);
+ text-decoration: none;
+}
+
+/* ---------- 主容器 ---------- */
+body.page-public .container {
+ max-width: 880px;
+ padding: 24px 20px 56px;
+ gap: 18px;
+}
+
+/* ---------- 通用卡片润色 ---------- */
+body.page-public .container > .card {
+ border-radius: 16px;
+ background: linear-gradient(180deg,
+   rgba(255, 255, 255, 0.02),
+   rgba(255, 255, 255, 0) 40%),
+   var(--surface);
+ border: 1px solid var(--border);
+ box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset;
+ transition: border-color 0.18s;
+}
+
+body.page-public .container > .card:hover {
+ border-color: var(--border-strong);
+}
+
+body.page-public .container > .card > h2 {
+ font-size: 12px;
+ letter-spacing: 0.10em;
+ color: var(--text-tertiary);
+ margin-bottom: 16px;
+}
+
+/* ---------- 活动状态（视觉强调） ---------- */
+body.page-public #event-status {
+ background:
+  linear-gradient(135deg,
+   rgba(79, 140, 255, 0.10),
+   rgba(124, 92, 255, 0.06) 60%,
+   transparent 100%),
+   var(--surface);
+ border: 1px solid rgba(79, 140, 255, 0.28);
+ position: relative;
+ overflow: hidden;
+}
+
+body.page-public #event-status::after {
+ content: "";
+ position: absolute;
+ inset: 0;
+ background: radial-gradient(600px 200px at 100% 0%,
+   rgba(79, 140, 255, 0.18), transparent 70%);
+ pointer-events: none;
+}
+
+body.page-public #event-status #status-text {
+ font-size: 22px;
+ font-weight: 700;
+ line-height: 1.2;
+ display: flex;
+ align-items: center;
+ gap: 10px;
+ flex-wrap: wrap;
+ position: relative;
+ z-index: 1;
+}
+
+body.page-public #event-status #status-text .badge {
+ font-size: 14px;
+ padding: 6px 14px;
+ border-radius: var(--r-full);
+}
+
+body.page-public #event-status #day-text {
+ margin-top: 8px;
+ font-size: 14px;
+ position: relative;
+ z-index: 1;
+}
+
+/* ---------- 阵营分数 ---------- */
+body.page-public .colleges-grid {
+ grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+ gap: 14px;
+}
+
+body.page-public .college-card {
+ position: relative;
+ padding: 18px 12px 16px;
+ border-radius: 14px;
+ background: var(--elevated);
+ border: 1px solid var(--border);
+ overflow: hidden;
+ text-align: center;
+ transition: transform 0.18s, border-color 0.18s;
+}
+
+body.page-public .college-card:hover {
+ transform: translateY(-2px);
+ border-color: var(--border-strong);
+}
+
+body.page-public .college-card .college-name {
+ display: inline-flex;
+ align-items: center;
+ justify-content: center;
+ padding: 4px 12px;
+ margin: 0 auto 12px;
+ border-radius: var(--r-full);
+ font-size: 12px;
+ font-weight: 700;
+ color: #fff;
+ letter-spacing: 0.02em;
+ line-height: 1.4;
+ box-shadow: 0 4px 14px rgba(0, 0, 0, 0.30);
+}
+
+body.page-public .college-card .college-score {
+ font-size: 36px;
+ font-weight: 800;
+ padding: 0;
+ line-height: 1;
+ font-variant-numeric: tabular-nums;
+ color: var(--text);
+}
+
+body.page-public .college-card .college-count {
+ padding: 8px 0 0;
+ font-size: 12px;
+ color: var(--text-tertiary);
+}
+
+/* ---------- 人数 ---------- */
+body.page-public #counts p {
+ display: flex;
+ align-items: baseline;
+ gap: 20px;
+ flex-wrap: wrap;
+ font-size: 15px;
+ color: var(--text-secondary);
+}
+
+body.page-public #counts strong {
+ font-size: 24px;
+ font-weight: 800;
+ color: var(--text);
+ font-variant-numeric: tabular-nums;
+ margin-left: 4px;
+}
+
+/* ---------- 今日规则 ---------- */
+body.page-public #today-rule #rule-title {
+ font-size: 16px;
+ font-weight: 700;
+ margin-bottom: 6px;
+ color: var(--text);
+}
+
+body.page-public #today-rule #rule-content {
+ font-size: 14px;
+ color: var(--text-secondary);
+}
+
+/* ---------- 存活墙 ---------- */
+body.page-public .wall-grid {
+ grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+ gap: 14px;
+}
+
+body.page-public .wall-item {
+ padding: 6px;
+ border-radius: 12px;
+ background: rgba(255, 255, 255, 0.015);
+ border: 1px solid transparent;
+ transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+body.page-public .wall-item:hover {
+ background: rgba(255, 255, 255, 0.035);
+ border-color: var(--border);
+ transform: translateY(-2px);
+}
+
+body.page-public .wall-item img {
+ border-radius: 10px;
+ box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+body.page-public .wall-name {
+ font-size: 12.5px;
+ margin-top: 8px;
+}
+
+body.page-public .wall-college {
+ font-size: 11.5px;
+ margin-top: 2px;
+ font-weight: 600;
+}
+
+/* ---------- 最终赢家（金色主题） ---------- */
+body.page-public #winner {
+ background:
+  linear-gradient(135deg,
+   rgba(234, 179, 8, 0.08),
+   transparent 60%),
+   var(--surface);
+ border: 1px solid rgba(234, 179, 8, 0.28);
+}
+
+body.page-public #winner > h2 {
+ color: #fde047 !important;
+}
+
+body.page-public #winner .winner-card {
+ border: 1px solid rgba(234, 179, 8, 0.22);
+ background: var(--elevated);
+ transition: transform 0.18s, border-color 0.18s;
+}
+
+body.page-public #winner .winner-card:hover {
+ transform: translateY(-2px);
+ border-color: rgba(234, 179, 8, 0.45);
+}
+
+/* ---------- 响应式微调 ---------- */
+@media (max-width: 700px) {
+ body.page-public .site-header {
+  padding: 10px 14px;
+ }
+
+ body.page-public .container {
+  padding: 16px 14px calc(80px + env(safe-area-inset-bottom));
+  gap: 14px;
+ }
+
+ body.page-public .container > .card {
+  padding: 18px;
+  border-radius: 14px;
+ }
+
+ body.page-public #event-status #status-text {
+  font-size: 19px;
+ }
+
+ body.page-public .college-card .college-score {
+  font-size: 28px;
+ }
+
+ body.page-public .wall-grid {
+  grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+  gap: 10px;
+ }
+}
+/* ============================================================
+   Rules 板块：自适应列布局
+   ------------------------------------------------------------
+   问题：.rule-content 在 style.css 中被固定为两列
+         minmax(0, 1.15fr) minmax(260px, 0.85fr)
+         但只有 RULE 05 有 .rule-image-wrap，
+         其余规则块右侧会留出一大块空白。
+
+   方案：
+     · 默认 → 单列，内容占满整行
+     · 含 .rule-image-wrap（仅 RULE 05） → 恢复两列
+     · 使用 @supports 检测 :has()，老浏览器自动降级为单列
+   ============================================================ */
+
+/* 默认：单列。没有图片的规则块内容直接占满整行 */
+body.page-public .rule-content {
+ grid-template-columns: minmax(0, 1fr);
+ gap: 0;
+}
+
+/* 只有带图片的规则块才分两列 */
+@supports selector(:has(*)) {
+ body.page-public .rule-content:has(.rule-image-wrap) {
+  grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.85fr);
+  gap: 28px;
+ }
+}
+
+/* 平板横屏 / 小笔记本：图片规则也改单列，图放文字下方 */
+@media (max-width: 1024px) {
+ body.page-public .rule-content:has(.rule-image-wrap) {
+  grid-template-columns: 1fr;
+  gap: 20px;
+ }
+}
+
+/* 桌面宽屏：稍微放宽主容器，让规则内容更舒展 */
+@media (min-width: 1024px) {
+ body.page-public .container {
+  max-width: 960px;
+ }
+}
+
+/* 大屏：让 RULE 05 的地图显得更自然，不要被裁切得太死 */
+@media (min-width: 1024px) {
+ body.page-public .rule-content .rule-image {
+  aspect-ratio: 4 / 5;
+  max-height: 560px;
+  object-fit: contain;
+  background: rgba(0, 0, 0, 0.15);
+ }
+}
+
+/* ============================================================
+   Day N 徽章：从 .hint 灰字 → 主视觉胶囊
+   ------------------------------------------------------------
+   JS 端 public.js 会把 "第 N 天" / "Day N" 写进 #day-text，
+   活动非进行中时把它设为空字符串。这里只做纯 CSS 强化，
+   不涉及任何 JS / HTML 改动。
+   ============================================================ */
+
+body.page-public #event-status #day-text {
+ /* 布局 */
+ display: inline-flex;
+ align-items: center;
+ justify-content: center;
+ position: relative;
+ z-index: 1;
+
+ /* 尺寸 */
+ margin-top: 14px;
+ padding: 10px 22px;
+ border-radius: 14px;
+
+ /* 字号 */
+ font-size: 26px;
+ font-weight: 900;
+ letter-spacing: 0.04em;
+ line-height: 1.15;
+
+ /* 颜色：主色渐变 + 描边高光 */
+ color: #fff;
+ background: linear-gradient(135deg, #4f8cff 0%, #7c5cff 100%);
+ box-shadow:
+  0 10px 24px rgba(79, 140, 255, 0.38),
+  inset 0 1px 0 rgba(255, 255, 255, 0.18);
+
+ /* 数字等宽，切换天数时不抖动 */
+ font-variant-numeric: tabular-nums;
+ text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+
+ /* 覆盖 .hint 的灰色文字 */
+ color: #fff;
+}
+
+/* 活动未开始 / 已结束：JS 会把内容清空 → 自动隐藏，不留空白 */
+body.page-public #event-status #day-text:empty {
+ display: none;
+}
+
+/* 移动端：稍微收敛一点，避免把标题挤下去 */
+@media (max-width: 700px) {
+ body.page-public #event-status #day-text {
+  font-size: 20px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  margin-top: 10px;
+ }
+}
+
+/* ============================================================
+   Rules 展开 / 收起动画
+   ------------------------------------------------------------
+   原生 <details> 高度无法直接 transition。
+   现代浏览器（Chrome 131+ / Safari 18.2+ / Firefox 135+）
+   支持 ::details-content 伪元素 + interpolate-size，
+   可对 height: 0 → auto 做平滑过渡；
+   老浏览器自动走「内容淡入 + 加号旋转」降级。
+   全程纯 CSS，无 JS、无 HTML 改动。
+   ============================================================ */
+
+/* ---------- 允许 height: auto 参与过渡 ---------- */
+body.page-public {
+ interpolate-size: allow-keywords;
+}
+
+/* ---------- 卡片本体的颜色过渡 ---------- */
+body.page-public .rule-block {
+ transition: background-color 0.28s ease, border-color 0.28s ease;
+}
+
+body.page-public .rule-block[open] {
+ background: rgba(79, 140, 255, 0.035);
+ border-color: rgba(79, 140, 255, 0.28);
+}
+
+/* ---------- 展开 / 收起：高度平滑过渡（现代浏览器） ---------- */
+body.page-public .rule-block::details-content {
+ block-size: 0;
+ overflow: hidden;
+ transition:
+  block-size 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+  content-visibility 0.38s allow-discrete;
+}
+
+body.page-public .rule-block[open]::details-content {
+ block-size: auto;
+}
+
+/* ---------- 降级 + 叠加效果：内容淡入上移 ---------- */
+body.page-public .rule-block[open] .rule-content {
+ animation: rule-fade-in 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes rule-fade-in {
+ from {
+  opacity: 0;
+  transform: translateY(-8px);
+ }
+ to {
+  opacity: 1;
+  transform: translateY(0);
+ }
+}
+
+/* ---------- 加号 → 减号：平滑旋转 ---------- */
+body.page-public .rule-toggle::before,
+body.page-public .rule-toggle::after {
+ transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+body.page-public .rule-block[open] .rule-toggle::before {
+ transform: translate(-50%, -50%) rotate(180deg);
+}
+
+/* 覆盖 style.css 里的 display:none，改为旋转到水平方向 */
+body.page-public .rule-block[open] .rule-toggle::after {
+ display: block;
+ transform: translate(-50%, -50%) rotate(180deg);
+}
+
+/* ---------- Summary 微交互 ---------- */
+body.page-public .rule-summary {
+ transition: background-color 0.18s ease;
+}
+
+body.page-public .rule-block[open] > .rule-summary {
+ background: rgba(79, 140, 255, 0.05);
+}
+
+body.page-public .rule-block[open] .rule-toggle {
+ border-color: var(--primary);
+ color: var(--primary);
+}
+
+/* ---------- 移动端：动画稍微加快，避免拖沓 ---------- */
+@media (max-width: 700px) {
+ body.page-public .rule-block::details-content {
+  transition:
+   block-size 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+   content-visibility 0.28s allow-discrete;
+ }
+
+ body.page-public .rule-block[open] .rule-content {
+  animation-duration: 0.28s;
+ }
+}
+
+/* ---------- 无障碍：尊重「减少动态效果」偏好 ---------- */
+@media (prefers-reduced-motion: reduce) {
+ body.page-public .rule-block::details-content {
+  transition: none;
+ }
+
+ body.page-public .rule-block[open] .rule-content {
+  animation: none;
+ }
+
+ body.page-public .rule-toggle::before,
+ body.page-public .rule-toggle::after {
+  transition: none;
+ }
+}

@@ -6,6 +6,7 @@ import {
     qs, qsa, showToast, setLoading, confirmDialog,
     bindModalBackdrop, formatRelative, escapeHtml, emptyState,
 } from './utils.js';
+import { isPurpleHouse } from './public.js';
 import {
     initParticipants, refreshParticipants, refreshParticipantsI18n,
 } from './admin-participants.js';
@@ -253,7 +254,12 @@ function renderSuggest() {
 function renderOverviewColleges() {
     const el = qs('overview-colleges');
     if (!el) return;
-    const colleges = state.colleges;
+
+    const visibleColleges = state.colleges.filter(c =>
+    !isPurpleHouse(c)
+    );
+    
+    const colleges = visibleColleges;
     if (!colleges.length) {
         el.innerHTML = emptyState({
             title: t('overview.noColleges'),

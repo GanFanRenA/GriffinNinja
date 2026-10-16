@@ -18,7 +18,7 @@ const KILL_REASON_KEYS = {
 
 const COLLAPSE_PREFIX = 'ninjatag.collapse.';
 
-let chainFilter = { keyword: '', status: '' };
+let chainFilter = { keyword: '', status: '',sort:'', };
 let chainSignature = '';
 let pendingKill = null;
 let reinsertSelected = null;
@@ -67,6 +67,11 @@ export function initChain() {
 
     qs('chain-filter-status')?.addEventListener('change', (e) => {
         chainFilter.status = e.target.value;
+        renderChainList();
+    });
+    qs('chain-sort')?.addEventListener('change', (e) => {
+        chainFilter.sort = e.target.value || '';
+        chainSignature = '';   // 强制重新渲染（顺序变化时签名会变，但保险起见）
         renderChainList();
     });
 
@@ -137,11 +142,37 @@ function getFilteredChain() {
     });
 }
 
+/* ============================================================
+   排序：只按 Code / 目标 Code 排序
+   ============================================================ */
+function sortChainList(list) {
+  if (!chainFilter.sort) return list;   // 默认顺序：保持 RPC 返回原样
+
+  const key = chainFilter.sort.startsWith('target_code') ? 'target_code' : 'code';
+  const dir = chainFilter.sort.endsWith('_desc') ? -1 : 1;
+  const arr = list.slice();
+
+  arr.sort((a, b) => {
+    const ka = String(a?.[key] ?? '').trim();
+    const kb = String(b?.[key] ?? '').trim();
+
+    // 空值统一排到末尾（无论升序降序）
+    if (!ka && !kb) return 0;
+    if (!ka) return 1;
+    if (!kb) return -1;
+
+    // 使用 numeric + base，保证 001/002/010 按数值排序而非字符串字典序
+    const cmp = ka.localeCompare(kb, 'en', { numeric: true, sensitivity: 'base' });
+    return cmp * dir;
+  });
+
+  return arr;
+}
+
 function renderChainList() {
     const el = qs('chain-list');
     if (!el) return;
-
-    const list = getFilteredChain();
+    const list = sortChainList(getFilteredChain());
 
     if (!list.length) {
         el.innerHTML = state.chain.length
